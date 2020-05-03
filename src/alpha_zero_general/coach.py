@@ -8,8 +8,8 @@ from random import shuffle
 import numpy as np
 from tqdm import tqdm
 
-from .Arena import Arena
-from .MCTS import MCTS
+from .arena import Arena
+from .mcts import MCTS
 
 
 class Coach:
