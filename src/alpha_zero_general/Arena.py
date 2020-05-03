@@ -1,5 +1,5 @@
 import numpy as np
-from pytorch_classification.utils import Bar, AverageMeter
+from tqdm import tqdm
 import time
 
 class Arena():
@@ -67,17 +67,12 @@ class Arena():
             twoWon: games won by player2
             draws:  games won by nobody
         """
-        eps_time = AverageMeter()
-        bar = Bar('Arena.playGames', max=num)
-        end = time.time()
-        eps = 0
-        maxeps = int(num)
 
         num = int(num/2)
         oneWon = 0
         twoWon = 0
         draws = 0
-        for _ in range(num):
+        for _ in tqdm(range(num), desc="Arena.playGames (Player 1)"):
             gameResult = self.playGame(verbose=verbose)
             if gameResult==1:
                 oneWon+=1
@@ -85,17 +80,10 @@ class Arena():
                 twoWon+=1
             else:
                 draws+=1
-            # bookkeeping + plot progress
-            eps += 1
-            eps_time.update(time.time() - end)
-            end = time.time()
-            bar.suffix  = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps, maxeps=maxeps, et=eps_time.avg,
-                                                                                                       total=bar.elapsed_td, eta=bar.eta_td)
-            bar.next()
 
         self.player1, self.player2 = self.player2, self.player1
         
-        for _ in range(num):
+        for _ in tqdm(range(num), desc="Arena.playGames (Player 2)"):
             gameResult = self.playGame(verbose=verbose)
             if gameResult==-1:
                 oneWon+=1                
@@ -103,14 +91,5 @@ class Arena():
                 twoWon+=1
             else:
                 draws+=1
-            # bookkeeping + plot progress
-            eps += 1
-            eps_time.update(time.time() - end)
-            end = time.time()
-            bar.suffix  = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps, maxeps=maxeps, et=eps_time.avg,
-                                                                                                       total=bar.elapsed_td, eta=bar.eta_td)
-            bar.next()
-            
-        bar.finish()
 
         return oneWon, twoWon, draws

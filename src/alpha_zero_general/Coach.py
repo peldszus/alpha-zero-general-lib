@@ -2,7 +2,7 @@ from collections import deque
 from Arena import Arena
 from MCTS import MCTS
 import numpy as np
-from pytorch_classification.utils import Bar, AverageMeter
+from tqdm import tqdm
 import time, os, sys
 from pickle import Pickler, Unpickler
 from random import shuffle
@@ -77,21 +77,9 @@ class Coach():
             if not self.skipFirstSelfPlay or i>1:
                 iterationTrainExamples = deque([], maxlen=self.args.maxlenOfQueue)
     
-                eps_time = AverageMeter()
-                bar = Bar('Self Play', max=self.args.numEps)
-                end = time.time()
-    
-                for eps in range(self.args.numEps):
+                for _ in tqdm(range(self.args.numEps), desc="Self Play"):
                     self.mcts = MCTS(self.game, self.nnet, self.args)   # reset search tree
                     iterationTrainExamples += self.executeEpisode()
-    
-                    # bookkeeping + plot progress
-                    eps_time.update(time.time() - end)
-                    end = time.time()
-                    bar.suffix  = '({eps}/{maxeps}) Eps Time: {et:.3f}s | Total: {total:} | ETA: {eta:}'.format(eps=eps+1, maxeps=self.args.numEps, et=eps_time.avg,
-                                                                                                               total=bar.elapsed_td, eta=bar.eta_td)
-                    bar.next()
-                bar.finish()
 
                 # save the iteration examples to the history 
                 self.trainExamplesHistory.append(iterationTrainExamples)
