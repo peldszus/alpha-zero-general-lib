@@ -24,12 +24,10 @@ class Coach:
         self.pnet = self.nnet.__class__(self.game)  # the competitor network
         self.args = args
         self.mcts = MCTS(self.game, self.nnet, self.args)
-        self.trainExamplesHistory = (
-            []
-        )  # history of examples from args.numItersForTrainExamplesHistory latest iterations
-        self.skipFirstSelfPlay = (
-            False  # can be overriden in loadTrainExamples()
-        )
+        # history of examples from args.numItersForTrainExamplesHistory latest iterations
+        self.trainExamplesHistory = []
+        # can be overriden in loadTrainExamples()
+        self.skipFirstSelfPlay = False
 
     def executeEpisode(self):
         """
@@ -94,9 +92,8 @@ class Coach:
                 )
 
                 for _ in tqdm(range(self.args.numEps), desc="Self Play"):
-                    self.mcts = MCTS(
-                        self.game, self.nnet, self.args
-                    )  # reset search tree
+                    # reset search tree
+                    self.mcts = MCTS(self.game, self.nnet, self.args)
                     iterationTrainExamples += self.executeEpisode()
 
                 # save the iteration examples to the history
