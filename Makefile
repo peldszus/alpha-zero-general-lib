@@ -25,7 +25,7 @@ install-dev: install-poetry
 
 install-commit-hooks: install-dev
 	if [ ! -d ".git" ]; then git init; fi
-	# ${VIRTUALENV_DIR}/bin/pre-commit install -t pre-commit
+	${VIRTUALENV_DIR}/bin/pre-commit install -t pre-commit
 
 test:
 	${VIRTUALENV_DIR}/bin/py.test tests --cov src --cov-report=xml\:coverage.xml -vvv
