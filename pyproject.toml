@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "alpha-zero-general-lib"
 version = "0.1.0"
-description = "A simplified, highly flexible, commented and (hopefully) easy to understand implementation of self-play based reinforcement learning based on the AlphaGo Zero paper"
+description = "A simplified, highly flexible, commented and (hopefully) easy to understand implementation of self-play based reinforcement learning based on the AlphaGo Zero paper turned into a library"
 authors = ["Surag Nair", "Shantanu Thakoor", "Megha Jhunjhunwala", "Andreas Peldszus"]
 license = "MIT"
 packages = [
@@ -14,12 +14,27 @@ numpy = "^1.18.3"
 tqdm = "^4.46.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.4.1"
+pre-commit = "^2.3.0"
 black = "^19.10b0"
 flake8 = "^3.7.9"
+flake8-bugbear = "^20.1.4"
 pylint = "^2.5.0"
-pre-commit = "^2.3.0"
+pytest = "^5.4.1"
 pytest-cov = "^2.8.1"
+
+[tool.black]
+line-length = 79
+target_version = ["py37"]
+exclude = "\\.git|env"
+
+[tool.isort]
+known_third_party = ["alpha_zero_general", "numpy", "tqdm"]
+line_length = 79
+force_single_line = true
+multi_line_output = 3
+force_grid_wrap = 0
+include_trailing_comma = true
+use_parentheses = true
 
 [build-system]
 requires = ["poetry>=0.12"]
