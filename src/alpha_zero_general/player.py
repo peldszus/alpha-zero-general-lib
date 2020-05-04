@@ -9,10 +9,10 @@ class RandomPlayer:
         self.game = game
 
     def play(self, board):
-        a = np.random.randint(self.game.getActionSize())
-        valids = self.game.getValidMoves(board, 1)
+        a = np.random.randint(self.game.get_action_size())
+        valids = self.game.get_valid_moves(board, 1)
         while valids[a] != 1:
-            a = np.random.randint(self.game.getActionSize())
+            a = np.random.randint(self.game.get_action_size())
         return a
 
 
@@ -22,7 +22,7 @@ class HumanPlayer:
 
     def play(self, board):
         # display(board)
-        valid = self.game.getValidMoves(board, 1)
+        valid = self.game.get_valid_moves(board, 1)
         for i in range(len(valid)):
             if valid[i]:
                 print(
@@ -59,12 +59,12 @@ class GreedyPlayer:
         self.game = game
 
     def play(self, board):
-        valids = self.game.getValidMoves(board, 1)
+        valids = self.game.get_valid_moves(board, 1)
         candidates = []
-        for a in range(self.game.getActionSize()):
+        for a in range(self.game.get_action_size()):
             if valids[a] == 0:
                 continue
-            nextBoard, _ = self.game.getNextState(board, 1, a)
+            nextBoard, _ = self.game.get_next_state(board, 1, a)
             score = self.game.getScore(nextBoard, 1)
             candidates += [(-score, a)]
         candidates.sort()
@@ -89,4 +89,4 @@ class AlphaZeroPlayer:
         self.mcts = MCTS(self.game, self.net, self.args)
 
     def play(self, board):
-        return np.argmax(self.mcts.getActionProb(board, temp=0))
+        return np.argmax(self.mcts.get_action_prob(board, temp=0))

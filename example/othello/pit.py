@@ -21,4 +21,4 @@ player2 = AlphaZeroPlayer(game, NNetWrapper, folder, filename)
 
 arena = Arena(player1.play, player2.play, game, display=OthelloGame.display)
 
-print(arena.playGames(2, verbose=False))
+print(arena.play_games(2, verbose=True))

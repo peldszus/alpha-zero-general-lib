@@ -26,10 +26,10 @@ class Coach:
         self.mcts = MCTS(self.game, self.nnet, self.args)
         # history of examples from args.numItersForTrainExamplesHistory latest iterations
         self.trainExamplesHistory = []
-        # can be overriden in loadTrainExamples()
+        # can be overriden in load_train_examples()
         self.skipFirstSelfPlay = False
 
-    def executeEpisode(self):
+    def execute_episode(self):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -46,26 +46,28 @@ class Coach:
                            the player eventually won the game, else -1.
         """
         trainExamples = []
-        board = self.game.getInitBoard()
+        board = self.game.get_init_board()
         self.curPlayer = 1
         episodeStep = 0
 
         while True:
             episodeStep += 1
-            canonicalBoard = self.game.getCanonicalForm(board, self.curPlayer)
+            canonicalBoard = self.game.get_canonical_form(
+                board, self.curPlayer
+            )
             temp = int(episodeStep < self.args.tempThreshold)
 
-            pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
-            sym = self.game.getSymmetries(canonicalBoard, pi)
+            pi = self.mcts.get_action_prob(canonicalBoard, temp=temp)
+            sym = self.game.get_symmetries(canonicalBoard, pi)
             for b, p in sym:
                 trainExamples.append([b, self.curPlayer, p, None])
 
             action = np.random.choice(len(pi), p=pi)
-            board, self.curPlayer = self.game.getNextState(
+            board, self.curPlayer = self.game.get_next_state(
                 board, self.curPlayer, action
             )
 
-            r = self.game.getGameEnded(board, self.curPlayer)
+            r = self.game.get_game_ended(board, self.curPlayer)
 
             if r != 0:
                 return [
@@ -94,7 +96,7 @@ class Coach:
                 for _ in tqdm(range(self.args.numEps), desc="Self Play"):
                     # reset search tree
                     self.mcts = MCTS(self.game, self.nnet, self.args)
-                    iterationTrainExamples += self.executeEpisode()
+                    iterationTrainExamples += self.execute_episode()
 
                 # save the iteration examples to the history
                 self.trainExamplesHistory.append(iterationTrainExamples)
@@ -111,7 +113,7 @@ class Coach:
                 self.trainExamplesHistory.pop(0)
             # backup history to a file
             # NB! the examples were collected using the model from the previous iteration, so (i-1)
-            self.saveTrainExamples(i - 1)
+            self.save_train_examples(i - 1)
 
             # shuffle examples before training
             trainExamples = []
@@ -133,11 +135,11 @@ class Coach:
 
             print("PITTING AGAINST PREVIOUS VERSION")
             arena = Arena(
-                lambda x: np.argmax(pmcts.getActionProb(x, temp=0)),
-                lambda x: np.argmax(nmcts.getActionProb(x, temp=0)),
+                lambda x: np.argmax(pmcts.get_action_prob(x, temp=0)),
+                lambda x: np.argmax(nmcts.get_action_prob(x, temp=0)),
                 self.game,
             )
-            pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
+            pwins, nwins, draws = arena.play_games(self.args.arenaCompare)
 
             print(
                 "NEW/PREV WINS : %d / %d ; DRAWS : %d" % (nwins, pwins, draws)
@@ -154,27 +156,27 @@ class Coach:
                 print("ACCEPTING NEW MODEL")
                 self.nnet.save_checkpoint(
                     folder=self.args.checkpoint,
-                    filename=self.getCheckpointFile(i),
+                    filename=self.get_checkpoint_file(i),
                 )
                 self.nnet.save_checkpoint(
                     folder=self.args.checkpoint, filename="best.pth.tar"
                 )
 
-    def getCheckpointFile(self, iteration):
+    def get_checkpoint_file(self, iteration):
         return "checkpoint_" + str(iteration) + ".pth.tar"
 
-    def saveTrainExamples(self, iteration):
+    def save_train_examples(self, iteration):
         folder = self.args.checkpoint
         if not os.path.exists(folder):
             os.makedirs(folder)
         filename = os.path.join(
-            folder, self.getCheckpointFile(iteration) + ".examples"
+            folder, self.get_checkpoint_file(iteration) + ".examples"
         )
         with open(filename, "wb+") as f:
             Pickler(f).dump(self.trainExamplesHistory)
         f.closed
 
-    def loadTrainExamples(self):
+    def load_train_examples(self):
         modelFile = os.path.join(
             self.args.load_folder_file[0], self.args.load_folder_file[1]
         )

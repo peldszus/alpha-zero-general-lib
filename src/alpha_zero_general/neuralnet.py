@@ -31,7 +31,7 @@ class NeuralNet:
 
         Returns:
             pi: a policy vector for the current board- a numpy array of length
-                game.getActionSize
+                game.get_action_size
             v: a float in [-1,1] that gives the value of the current board
         """
         pass
