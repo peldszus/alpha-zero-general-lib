@@ -1,7 +1,7 @@
+from alpha_zero_general import AlphaZeroPlayer
 from alpha_zero_general import Arena
 from alpha_zero_general import GreedyPlayer
 from alpha_zero_general import HumanPlayer  # noqa
-from alpha_zero_general import NeuralNetPlayer
 from alpha_zero_general import RandomPlayer  # noqa
 
 from NNet import NNetWrapper
@@ -17,8 +17,8 @@ game = OthelloGame(6)
 player1 = GreedyPlayer(game)
 
 folder, filename = "./temp/", "best.pth.tar"
-player2 = NeuralNetPlayer(game, NNetWrapper, folder, filename)
+player2 = AlphaZeroPlayer(game, NNetWrapper, folder, filename)
 
 arena = Arena(player1.play, player2.play, game, display=OthelloGame.display)
 
-print(arena.playGames(10, verbose=False))
+print(arena.playGames(2, verbose=False))

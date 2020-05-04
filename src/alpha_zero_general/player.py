@@ -71,7 +71,7 @@ class GreedyPlayer:
         return candidates[0][1]
 
 
-class NeuralNetPlayer:
+class AlphaZeroPlayer:
     def __init__(
         self,
         game,
