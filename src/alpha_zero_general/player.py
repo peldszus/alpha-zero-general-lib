@@ -1,5 +1,8 @@
 import numpy as np
 
+from .mcts import MCTS
+from .utils import dotdict
+
 
 class RandomPlayer:
     def __init__(self, game):
@@ -66,3 +69,24 @@ class GreedyPlayer:
             candidates += [(-score, a)]
         candidates.sort()
         return candidates[0][1]
+
+
+class NeuralNetPlayer:
+    def __init__(
+        self,
+        game,
+        nnwrapper_class,
+        folder=None,
+        filename=None,
+        num_mcts_sims=50,
+        cpuct=1.0,
+    ):
+        self.game = game
+        self.net = nnwrapper_class(game)
+        if folder and filename:
+            self.net.load_checkpoint(folder, filename)
+        self.args = dotdict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
+        self.mcts = MCTS(self.game, self.net, self.args)
+
+    def play(self, board):
+        return np.argmax(self.mcts.getActionProb(board, temp=0))
