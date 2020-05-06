@@ -65,7 +65,7 @@ class GreedyPlayer:
             if valids[a] == 0:
                 continue
             next_board, _ = self.game.get_next_state(board, 1, a)
-            score = self.game.getScore(next_board, 1)
+            score = self.game.get_score(next_board, 1)
             candidates += [(-score, a)]
         candidates.sort()
         return candidates[0][1]
