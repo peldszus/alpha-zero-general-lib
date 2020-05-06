@@ -1,12 +1,12 @@
 import os
 
 import numpy as np
+from alpha_zero_general import DotDict
 from alpha_zero_general import NeuralNet
-from alpha_zero_general import dotdict
 
 from OthelloNNet import OthelloNNet
 
-args = dotdict(
+args = DotDict(
     {
         "lr": 0.001,
         "dropout": 0.3,

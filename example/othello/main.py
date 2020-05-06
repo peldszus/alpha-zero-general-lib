@@ -1,10 +1,10 @@
 from alpha_zero_general import Coach
-from alpha_zero_general import dotdict
+from alpha_zero_general import DotDict
 
 from NNet import NNetWrapper
 from OthelloGame import OthelloGame
 
-args = dotdict(
+args = DotDict(
     {
         "numIters": 100,
         "numEps": 10,  # Number of complete self-play games to simulate during a new iteration.

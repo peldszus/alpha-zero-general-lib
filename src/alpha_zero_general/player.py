@@ -1,7 +1,7 @@
 import numpy as np
 
 from .mcts import MCTS
-from .utils import dotdict
+from .utils import DotDict
 
 
 class RandomPlayer:
@@ -85,7 +85,7 @@ class AlphaZeroPlayer:
         self.net = nnwrapper_class(game)
         if folder and filename:
             self.net.load_checkpoint(folder, filename)
-        self.args = dotdict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
+        self.args = DotDict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
         self.mcts = MCTS(self.game, self.net, self.args)
 
     def play(self, board):
