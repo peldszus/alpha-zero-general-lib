@@ -1,8 +1,8 @@
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
 
-from NNet import NNetWrapper
-from OthelloGame import OthelloGame
+from game import OthelloGame
+from nnet_wrapper import NNetWrapper
 
 args = DotDict(
     {

@@ -4,7 +4,7 @@ import numpy as np
 from alpha_zero_general import DotDict
 from alpha_zero_general import NeuralNet
 
-from OthelloNNet import OthelloNNet
+from nnet import OthelloNNet
 
 args = DotDict(
     {

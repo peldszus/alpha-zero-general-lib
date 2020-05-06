@@ -4,8 +4,8 @@ from alpha_zero_general import GreedyPlayer
 from alpha_zero_general import HumanPlayer  # noqa
 from alpha_zero_general import RandomPlayer  # noqa
 
-from NNet import NNetWrapper
-from OthelloGame import OthelloGame
+from game import OthelloGame
+from nnet_wrapper import NNetWrapper
 
 """
 use this script to play any two agents against each other, or play manually with
