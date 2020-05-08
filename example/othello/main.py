@@ -1,8 +1,8 @@
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
 
-from game import OthelloGame
-from nnet_wrapper import NNetWrapper
+from .game import OthelloGame
+from .nnet import OthelloNNet
 
 args = DotDict(
     {
@@ -22,16 +22,16 @@ args = DotDict(
 )
 
 if __name__ == "__main__":
-    g = OthelloGame(6)
-    nnet = NNetWrapper(g)
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
 
     if args.load_model:
         nnet.load_checkpoint(
             args.load_folder_file[0], args.load_folder_file[1]
         )
 
-    c = Coach(g, nnet, args)
+    coach = Coach(game, nnet, args)
     if args.load_model:
         print("Load trainExamples from file")
-        c.load_train_examples()
-    c.learn()
+        coach.load_train_examples()
+    coach.learn()

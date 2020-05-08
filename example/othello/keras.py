@@ -4,8 +4,6 @@ import numpy as np
 from alpha_zero_general import DotDict
 from alpha_zero_general import NeuralNet
 
-from nnet import OthelloNNet
-
 args = DotDict(
     {
         "lr": 0.001,
@@ -18,11 +16,18 @@ args = DotDict(
 )
 
 
-class NNetWrapper(NeuralNet):
+class KerasNetWrapper(NeuralNet):
     def __init__(self, game):
-        self.nnet = OthelloNNet(game, args)
-        self.board_x, self.board_y = game.get_board_size()
-        self.action_size = game.get_action_size()
+        self.model = self.get_model(
+            game.get_board_size(), game.get_action_size(), args,
+        )
+
+    @staticmethod
+    def get_model(board_size, action_size, args):
+        """
+        Return compiled tensorflow.keras.models.Model.
+        """
+        raise NotImplementedError
 
     def train(self, examples):
         """
@@ -32,7 +37,7 @@ class NNetWrapper(NeuralNet):
         input_boards = np.asarray(input_boards)
         target_pis = np.asarray(target_pis)
         target_vs = np.asarray(target_vs)
-        self.nnet.model.fit(
+        self.model.fit(
             x=input_boards,
             y=[target_pis, target_vs],
             batch_size=args.batch_size,
@@ -47,7 +52,7 @@ class NNetWrapper(NeuralNet):
         board = board[np.newaxis, :, :]
 
         # run
-        pi, v = self.nnet.model.predict(board)
+        pi, v = self.model.predict(board)
         return pi[0], v[0]
 
     def save_checkpoint(
@@ -63,11 +68,11 @@ class NNetWrapper(NeuralNet):
             os.mkdir(folder)
         else:
             print("Checkpoint Directory exists! ")
-        self.nnet.model.save_weights(filepath)
+        self.model.save_weights(filepath)
 
     def load_checkpoint(
         self, folder="checkpoint", filename="checkpoint.pth.tar"
     ):
         # https://github.com/pytorch/examples/blob/master/imagenet/main.py#L98
         filepath = os.path.join(folder, filename)
-        self.nnet.model.load_weights(filepath)
+        self.model.load_weights(filepath)

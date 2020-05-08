@@ -4,8 +4,8 @@ from alpha_zero_general import GreedyPlayer
 from alpha_zero_general import HumanPlayer  # noqa
 from alpha_zero_general import RandomPlayer  # noqa
 
-from game import OthelloGame
-from nnet_wrapper import NNetWrapper
+from .game import OthelloGame
+from .nnet import OthelloNNet
 
 """
 use this script to play any two agents against each other, or play manually with
@@ -17,7 +17,7 @@ game = OthelloGame(6)
 player1 = GreedyPlayer(game)
 
 folder, filename = "./temp/", "best.pth.tar"
-player2 = AlphaZeroPlayer(game, NNetWrapper, folder, filename)
+player2 = AlphaZeroPlayer(game, OthelloNNet, folder, filename)
 
 arena = Arena(player1.play, player2.play, game, display=OthelloGame.display)
 

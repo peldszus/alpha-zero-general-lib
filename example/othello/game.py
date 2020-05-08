@@ -1,7 +1,7 @@
 import numpy as np
 from alpha_zero_general import Game
 
-from logic import Board
+from .logic import Board
 
 
 class OthelloGame(Game):

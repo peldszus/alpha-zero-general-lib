@@ -9,20 +9,22 @@ from tensorflow.keras.layers import Reshape
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 
+from .keras import KerasNetWrapper
 
-class OthelloNNet:
-    def __init__(self, game, args):
+
+class OthelloNNet(KerasNetWrapper):
+    @staticmethod
+    def get_model(board_size, action_size, args):
         # game params
-        self.board_x, self.board_y = game.get_board_size()
-        self.action_size = game.get_action_size()
-        self.args = args
+        board_x, board_y = board_size
+        action_size = action_size
 
         # Neural Net
 
         # s: batch_size x board_x x board_y
-        self.input_boards = Input(shape=(self.board_x, self.board_y))
+        input_boards = Input(shape=(board_x, board_y))
         # batch_size  x board_x x board_y x 1
-        x_image = Reshape((self.board_x, self.board_y, 1))(self.input_boards)
+        x_image = Reshape((board_x, board_y, 1))(input_boards)
         # batch_size  x board_x x board_y x num_channels
         h_conv1 = Activation("relu")(
             BatchNormalization(axis=3)(
@@ -70,14 +72,13 @@ class OthelloNNet:
                 BatchNormalization(axis=1)(Dense(512, use_bias=False)(s_fc1))
             )
         )
-        # batch_size x self.action_size
-        self.pi = Dense(self.action_size, activation="softmax", name="pi")(
-            s_fc2
-        )
+        # batch_size x action_size
+        pi = Dense(action_size, activation="softmax", name="pi")(s_fc2)
         # batch_size x 1
-        self.v = Dense(1, activation="tanh", name="v")(s_fc2)
-        self.model = Model(inputs=self.input_boards, outputs=[self.pi, self.v])
-        self.model.compile(
+        v = Dense(1, activation="tanh", name="v")(s_fc2)
+        model = Model(inputs=input_boards, outputs=[pi, v])
+        model.compile(
             loss=["categorical_crossentropy", "mean_squared_error"],
             optimizer=Adam(args.lr),
         )
+        return model
