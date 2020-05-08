@@ -1,3 +1,7 @@
+"""
+Generic player classes.
+"""
+
 import numpy as np
 
 from .mcts import MCTS
@@ -5,18 +9,22 @@ from .utils import DotDict
 
 
 class RandomPlayer:
+    """Selects a random valid action."""
+
     def __init__(self, game):
         self.game = game
 
     def play(self, board):
-        a = np.random.randint(self.game.get_action_size())
+        action = np.random.randint(self.game.get_action_size())
         valids = self.game.get_valid_moves(board, 1)
-        while valids[a] != 1:
-            a = np.random.randint(self.game.get_action_size())
-        return a
+        while valids[action] != 1:
+            action = np.random.randint(self.game.get_action_size())
+        return action
 
 
 class HumanPlayer:
+    """Selects an actions based on human input."""
+
     def __init__(self, game):
         self.game = game
 
@@ -55,6 +63,11 @@ class HumanPlayer:
 
 
 class GreedyPlayer:
+    """
+    Selects the action with the best immediate outcome according to
+    a heuristic evaluation function game.get_score().
+    """
+
     def __init__(self, game):
         self.game = game
 
@@ -71,18 +84,43 @@ class GreedyPlayer:
         return candidates[0][1]
 
 
+class BareModelPlayer:
+    """
+    Selects the actions with the highest probability according to the model
+    without simulating future steps using MCTS.
+    """
+
+    def __init__(
+        self, game, nnet_class, folder=None, filename=None,
+    ):
+        self.game = game
+        self.net = nnet_class(game)
+        if folder and filename:
+            self.net.load_checkpoint(folder, filename)
+
+    def play(self, board):
+        valids = self.game.get_valid_moves(board, 1)
+        pi, _ = self.net.predict(board)
+        return np.argmax(pi * valids)
+
+
 class AlphaZeroPlayer:
+    """
+    Selects the actions with the best outcome according to the model when
+    simulating future steps using MCTS.
+    """
+
     def __init__(
         self,
         game,
-        nnwrapper_class,
+        nnet_class,
         folder=None,
         filename=None,
         num_mcts_sims=50,
         cpuct=1.0,
     ):
         self.game = game
-        self.net = nnwrapper_class(game)
+        self.net = nnet_class(game)
         if folder and filename:
             self.net.load_checkpoint(folder, filename)
         self.args = DotDict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
