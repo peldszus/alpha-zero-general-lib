@@ -34,6 +34,20 @@ class Game:
         """
         pass
 
+    def get_action_names(self):
+        """
+        Returns:
+            action_names: a dictionary mapping action names to actions
+        """
+        pass
+
+    def get_action_prompt(self):
+        """
+        Returns:
+            action_prompt: A message shown to ask a human player for input.
+        """
+        return "Your move > "
+
     def get_next_state(self, board, player, action):
         """
         Input:

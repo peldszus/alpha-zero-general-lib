@@ -13,6 +13,9 @@ class OthelloGame(Game):
 
     def __init__(self, n):
         self.n = n
+        self.action_names = {
+            f"{x},{y}": x * n + y for x in range(n) for y in range(n)
+        }
 
     def get_init_board(self):
         # return initial board (numpy board)
@@ -26,6 +29,12 @@ class OthelloGame(Game):
     def get_action_size(self):
         # return number of actions
         return self.n * self.n + 1
+
+    def get_action_names(self):
+        return self.action_names
+
+    def get_action_prompt(self):
+        return "Your move: 'row,col' > "
 
     def get_next_state(self, board, player, action):
         # if player takes action on board, return next (board,player)
