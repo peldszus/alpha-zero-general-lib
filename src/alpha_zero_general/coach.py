@@ -47,31 +47,31 @@ class Coach:
         """
         train_examples = []
         board = self.game.get_init_board()
-        self.current_player = 1
+        current_player = 1
         episode_step = 0
 
         while True:
             episode_step += 1
             canonical_board = self.game.get_canonical_form(
-                board, self.current_player
+                board, current_player
             )
             temp = int(episode_step < self.args.tempThreshold)
 
             pi = self.mcts.get_action_prob(canonical_board, temp=temp)
             sym = self.game.get_symmetries(canonical_board, pi)
             for b, p in sym:
-                train_examples.append([b, self.current_player, p, None])
+                train_examples.append([b, current_player, p, None])
 
             action = np.random.choice(len(pi), p=pi)
-            board, self.current_player = self.game.get_next_state(
-                board, self.current_player, action
+            board, current_player = self.game.get_next_state(
+                board, current_player, action
             )
 
-            r = self.game.get_game_ended(board, self.current_player)
+            r = self.game.get_game_ended(board, current_player)
 
             if r != 0:
                 return [
-                    (x[0], x[2], r * ((-1) ** (x[1] != self.current_player)))
+                    (x[0], x[2], r * ((-1) ** (x[1] != current_player)))
                     for x in train_examples
                 ]
 
@@ -174,7 +174,6 @@ class Coach:
         )
         with open(filename, "wb+") as f:
             Pickler(f).dump(self.train_examples_history)
-        f.closed
 
     def load_train_examples(self):
         model_file = os.path.join(
@@ -190,6 +189,5 @@ class Coach:
             print("File with trainExamples found. Read it.")
             with open(examples_file, "rb") as f:
                 self.train_examples_history = Unpickler(f).load()
-            f.closed
             # examples based on the model were already collected (loaded)
             self.skip_first_self_play = True
