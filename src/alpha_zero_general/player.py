@@ -15,6 +15,7 @@ class RandomPlayer:
         self.game = game
 
     def play(self, board):
+        """Returns the action of the player for the given board."""
         action = np.random.randint(self.game.get_action_size())
         valids = self.game.get_valid_moves(board, 1)
         while valids[action] != 1:
@@ -29,6 +30,7 @@ class HumanPlayer:
         self.game = game
 
     def play(self, board):
+        """Returns the action of the player for the given board."""
         action_names = self.game.get_action_names()
         valids = self.game.get_valid_moves(board, 1)
         while True:
@@ -55,6 +57,7 @@ class GreedyPlayer:
         self.game = game
 
     def play(self, board):
+        """Returns the action of the player for the given board."""
         valids = self.game.get_valid_moves(board, 1)
         candidates = []
         for a in range(self.game.get_action_size()):
@@ -82,6 +85,7 @@ class BareModelPlayer:
             self.net.load_checkpoint(folder, filename)
 
     def play(self, board):
+        """Returns the action of the player for the given board."""
         valids = self.game.get_valid_moves(board, 1)
         pi, _ = self.net.predict(board)
         return np.argmax(pi * valids)
@@ -110,4 +114,5 @@ class AlphaZeroPlayer:
         self.mcts = MCTS(self.game, self.net, self.args)
 
     def play(self, board):
+        """Returns the action of the player for the given board."""
         return np.argmax(self.mcts.get_action_prob(board, temp=0))
