@@ -6,13 +6,14 @@ python:
 before_cache:
   - rm -f $HOME/.cache/pip/log/debug.log
 cache: pip
-install:
-  # - make install-dev install-test
+before_install:
+  - pip install --upgrade pip wheel
   - pip install poetry==1.0.5
+install:
   - poetry install -vvv
+before_script:
   - pip install tensorflow==2.*
 script:
-  # - make test
   - pytest tests --cov src/ --cov-report=xml\:coverage.xml --cov-report term-missing -vvv
 after_script: cd ~
 after_success:
