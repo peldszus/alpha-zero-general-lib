@@ -1,8 +1,13 @@
 # Alpha Zero General - as a library
 
-This is a fork of the https://github.com/suragnair/alpha-zero-general turned into a library.
+[![Build Status](https://travis-ci.org/peldszus/alpha-zero-general-lib.svg?branch=master)](https://travis-ci.org/peldszus/alpha-zero-general-lib)
+[![codecov](https://codecov.io/gh/peldszus/alpha-zero-general-lib/branch/master/graph/badge.svg)](https://codecov.io/gh/peldszus/alpha-zero-general-lib)
+[![GitHub](https://img.shields.io/github/license/peldszus/alpha-zero-general-lib)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
-The idea is to have a small and clean library version of the code, with minimal requirements, without many implementations of specific games.
+This is a fork of https://github.com/suragnair/alpha-zero-general turned into a library.
+
+The idea is to have a small and clean library version of the code, with minimal requirements, without many implementations of specific games or large model files.
 
 
 ## Information
@@ -27,10 +32,11 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [x] BareModelPlayer
 * [x] HumanPlayer: named action mapping
 * [x] Fix all flake8 issues
-* [x] Some tests
-* [ ] Travis CI tests
-* [ ] Coverage
+* [x] Add some tests
+* [x] Use travis CI tests
+* [x] Coverage report on codecov
 * [ ] More documentation
+* [ ] Make MCTS and model parameters explicit
 * [ ] Provide one entrypoint for training and pitting
 * [ ] Use Ray to parallelize self-play
 * [ ] A first pypi release
