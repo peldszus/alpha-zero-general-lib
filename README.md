@@ -33,10 +33,11 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [x] HumanPlayer: named action mapping
 * [x] Fix all flake8 issues
 * [x] Add some tests
-* [x] Use travis CI tests
-* [x] Coverage report on codecov
-* [ ] More documentation
+* [x] Use travis-ci.org tests
+* [x] Coverage report on codecov.org
+* [ ] Proper abstract classes for Game and NeuralNet
 * [ ] Make MCTS and model parameters explicit
+* [ ] More documentation
 * [ ] Provide one entrypoint for training and pitting
 * [ ] Use Ray to parallelize self-play
 * [ ] Tournaments and ELO scores
