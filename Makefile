@@ -1,6 +1,6 @@
 
 VIRTUALENV_DIR=${PWD}/env
-PIP=${VIRTUALENV_DIR}/bin/pip
+PIP=${VIRTUALENV_DIR}/bin/pip3
 POETRY=${VIRTUALENV_DIR}/bin/poetry
 PYTHON=${VIRTUALENV_DIR}/bin/python
 
