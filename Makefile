@@ -27,7 +27,10 @@ install-commit-hooks: install-dev
 	if [ ! -d ".git" ]; then git init; fi
 	${VIRTUALENV_DIR}/bin/pre-commit install -t pre-commit
 
-test:
+install-test: install-poetry
+	${PIP} install tensorflow==2.*
+
+test: install-test
 	${VIRTUALENV_DIR}/bin/pytest tests --cov src/ --cov-report=xml\:coverage.xml --cov-report term-missing -vvv
 
 clean:

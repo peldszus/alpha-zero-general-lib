@@ -1,0 +1,13 @@
+dist: bionic
+language: python
+python:
+  - "3.7"
+  - "3.8"
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
+cache: pip
+install: make install-dev install-test
+script: make test
+after_script: cd ~
+after_success:
+  - bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
