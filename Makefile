@@ -28,7 +28,7 @@ install-commit-hooks: install-dev
 	${VIRTUALENV_DIR}/bin/pre-commit install -t pre-commit
 
 test:
-	${VIRTUALENV_DIR}/bin/py.test tests --cov src --cov-report=xml\:coverage.xml -vvv
+	${VIRTUALENV_DIR}/bin/pytest tests --cov src/ --cov-report=xml\:coverage.xml --cov-report term-missing -vvv
 
 clean:
 	rm -f .coverage
