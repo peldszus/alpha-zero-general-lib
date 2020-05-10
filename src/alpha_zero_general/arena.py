@@ -14,9 +14,6 @@ class Arena:
             display: a function that takes board as input and prints it (e.g.
                      display in othello/OthelloGame). Is necessary for verbose
                      mode.
-
-        see othello/OthelloPlayers.py for an example. See pit.py for pitting
-        human players/other baselines with each other.
         """
         self.player1 = player1
         self.player2 = player2

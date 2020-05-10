@@ -33,17 +33,18 @@ class Coach:
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
-        trainExamples. The game is played till the game ends. After the game
+        train_examples. The game is played till the game ends. After the game
         ends, the outcome of the game is used to assign values to each example
-        in trainExamples.
+        in train_examples.
 
-        It uses a temp=1 if episodeStep < tempThreshold, and thereafter
+        It uses a temp=1 if episode_step < tempThreshold, and thereafter
         uses temp=0.
 
         Returns:
-            trainExamples: a list of examples of the form (canonicalBoard, currPlayer, pi,v)
-                           pi is the MCTS informed policy vector, v is +1 if
-                           the player eventually won the game, else -1.
+            train_examples: a list of examples of the form
+                            (canonical_board, current_player, pi,v)
+                            pi is the MCTS informed policy vector, v is +1 if
+                            the player eventually won the game, else -1.
         """
         train_examples = []
         board = self.game.get_init_board()
@@ -79,7 +80,7 @@ class Coach:
         """
         Performs numIters iterations with numEps episodes of self-play in each
         iteration. After every iteration, it retrains neural network with
-        examples in trainExamples (which has a maximum length of maxlenofQueue).
+        examples in train_examples (which has a maximum length of maxlenofQueue).
         It then pits the new neural network against the old one and accepts it
         only if it wins >= updateThreshold fraction of games.
         """
@@ -182,11 +183,11 @@ class Coach:
         examples_file = model_file + ".examples"
         if not os.path.isfile(examples_file):
             print(examples_file)
-            r = input("File with trainExamples not found. Continue? [y|n]")
+            r = input("File with training examples not found. Continue? [y|n]")
             if r != "y":
                 sys.exit()
         else:
-            print("File with trainExamples found. Read it.")
+            print("File with training examples found. Read it.")
             with open(examples_file, "rb") as f:
                 self.train_examples_history = Unpickler(f).load()
             # examples based on the model were already collected (loaded)

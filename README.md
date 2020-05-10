@@ -39,6 +39,7 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [ ] Make MCTS and model parameters explicit
 * [ ] Provide one entrypoint for training and pitting
 * [ ] Use Ray to parallelize self-play
+* [ ] Tournaments and ELO scores
 * [ ] A first pypi release
 
 
