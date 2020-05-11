@@ -1,33 +1,31 @@
 import os
 import sys
 from collections import deque
+from copy import deepcopy
+from itertools import chain
 from pickle import Pickler
 from pickle import Unpickler
 from random import shuffle
 
 import numpy as np
-from tqdm import tqdm
+import ray
 
 from .arena import Arena
 from .mcts import MCTS
+from .utils import DotDict
+
+nr_actors = 4
 
 
-class Coach:
-    """
-    This class executes the self-play + learning. It uses the functions defined
-    in Game and NeuralNet. args are specified in main.py.
-    """
-
-    def __init__(self, game, nnet, args):
+@ray.remote
+class SelfPlayWorker:
+    def __init__(self, game, nnet_class, args, folder="", filename=""):
         self.game = game
-        self.nnet = nnet
-        self.pnet = self.nnet.__class__(self.game)  # the competitor network
-        self.args = args
-        self.mcts = MCTS(self.game, self.nnet, self.args)
-        # history of examples from args.numItersForTrainExamplesHistory latest iterations
-        self.train_examples_history = []
-        # can be overriden in load_train_examples()
-        self.skip_first_self_play = False
+        self.args = DotDict(args)
+        self.nnet = nnet_class(self.game)
+        self.nnet.load_checkpoint(folder=folder, filename=filename)
+        # TODO: be able to pass picklable weights instead of checkpoints
+        self.mcts = None
 
     def execute_episode(self):
         """
@@ -45,7 +43,8 @@ class Coach:
                             (canonical_board, current_player, pi,v)
                             pi is the MCTS informed policy vector, v is +1 if
                             the player eventually won the game, else -1.
-        """
+        """  # TODO: incorrect description of return
+        self.mcts = MCTS(self.game, self.nnet, self.args)
         train_examples = []
         board = self.game.get_init_board()
         current_player = 1
@@ -76,6 +75,23 @@ class Coach:
                     for x in train_examples
                 ]
 
+
+class Coach:
+    """
+    This class executes the self-play + learning. It uses the functions defined
+    in Game and NeuralNet. args are specified in main.py.
+    """
+
+    def __init__(self, game, nnet, args):
+        self.game = game
+        self.nnet = nnet
+        self.pnet = self.nnet.__class__(self.game)  # the competitor network
+        self.args = args
+        # history of examples from args.numItersForTrainExamplesHistory latest iterations
+        self.train_examples_history = []
+        # can be overriden in load_train_examples()
+        self.skip_first_self_play = False
+
     def learn(self):
         """
         Performs numIters iterations with numEps episodes of self-play in each
@@ -84,20 +100,46 @@ class Coach:
         It then pits the new neural network against the old one and accepts it
         only if it wins >= updateThreshold fraction of games.
         """
-
+        ray.init(ignore_reinit_error=True)
         for i in range(1, self.args.numIters + 1):
             # bookkeeping
             print("------ITER " + str(i) + "------")
-            # examples of the iteration
+
+            # prepare workers
+            self.nnet.save_checkpoint(
+                folder=self.args.checkpoint, filename="temp.pth.tar"
+            )
+            workers = [
+                SelfPlayWorker.remote(
+                    deepcopy(self.game),
+                    self.nnet.__class__,
+                    dict(self.args),
+                    folder=self.args.checkpoint,
+                    filename="temp.pth.tar",
+                )
+                for _ in range(nr_actors)
+            ]
+
+            # generate examples of the iteration
             if not self.skip_first_self_play or i > 1:
                 iteration_train_examples = deque(
                     [], maxlen=self.args.maxlenOfQueue
                 )
 
-                for _ in tqdm(range(self.args.numEps), desc="Self Play"):
-                    # reset search tree
-                    self.mcts = MCTS(self.game, self.nnet, self.args)
-                    iteration_train_examples += self.execute_episode()
+                # split the works into chunks
+                # TODO: stream instead of chunks
+                # TODO: re-add progress bar
+                workers_to_use = [nr_actors] * (
+                    self.args.numEps // nr_actors
+                ) + [self.args.numEps % nr_actors]
+                for worker_count in workers_to_use:
+                    futures = [
+                        w.execute_episode.remote()
+                        for w in workers[:worker_count]
+                    ]
+                    iteration_train_examples += chain.from_iterable(
+                        ray.get(futures)
+                    )
 
                 # save the iteration examples to the history
                 self.train_examples_history.append(iteration_train_examples)
@@ -162,6 +204,7 @@ class Coach:
                 self.nnet.save_checkpoint(
                     folder=self.args.checkpoint, filename="best.pth.tar"
                 )
+        ray.shutdown()
 
     def get_checkpoint_file(self, iteration):
         return "checkpoint_" + str(iteration) + ".pth.tar"
