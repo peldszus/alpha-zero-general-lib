@@ -2,23 +2,21 @@ import os
 import sys
 from collections import deque
 from copy import deepcopy
-from itertools import chain
 from pickle import Pickler
 from pickle import Unpickler
 from random import shuffle
 
 import numpy as np
 import ray
+from tqdm import tqdm
 
 from .arena import Arena
 from .mcts import MCTS
 from .utils import DotDict
 
-nr_actors = 4
-
 
 @ray.remote
-class SelfPlayWorker:
+class SelfPlayActor:
     def __init__(self, game, nnet_class, args, folder="", filename=""):
         self.game = game
         self.args = DotDict(args)
@@ -27,7 +25,7 @@ class SelfPlayWorker:
         # TODO: be able to pass picklable weights instead of checkpoints
         self.mcts = None
 
-    def execute_episode(self):
+    def execute_episode(self, episode_number=None):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -101,24 +99,29 @@ class Coach:
         only if it wins >= updateThreshold fraction of games.
         """
         ray.init(ignore_reinit_error=True)
+
         for i in range(1, self.args.numIters + 1):
             # bookkeeping
             print("------ITER " + str(i) + "------")
 
-            # prepare workers
+            # store model to be loaded to actors
             self.nnet.save_checkpoint(
                 folder=self.args.checkpoint, filename="temp.pth.tar"
             )
-            workers = [
-                SelfPlayWorker.remote(
-                    deepcopy(self.game),
-                    self.nnet.__class__,
-                    dict(self.args),
-                    folder=self.args.checkpoint,
-                    filename="temp.pth.tar",
-                )
-                for _ in range(nr_actors)
-            ]
+
+            # setup self play actor pool
+            actor_pool = ray.util.ActorPool(
+                [
+                    SelfPlayActor.remote(
+                        deepcopy(self.game),
+                        self.nnet.__class__,
+                        dict(self.args),
+                        folder=self.args.checkpoint,
+                        filename="temp.pth.tar",
+                    )
+                    for _ in range(self.args.nr_actors)
+                ]
+            )
 
             # generate examples of the iteration
             if not self.skip_first_self_play or i > 1:
@@ -126,20 +129,15 @@ class Coach:
                     [], maxlen=self.args.maxlenOfQueue
                 )
 
-                # split the works into chunks
-                # TODO: stream instead of chunks
-                # TODO: re-add progress bar
-                workers_to_use = [nr_actors] * (
-                    self.args.numEps // nr_actors
-                ) + [self.args.numEps % nr_actors]
-                for worker_count in workers_to_use:
-                    futures = [
-                        w.execute_episode.remote()
-                        for w in workers[:worker_count]
-                    ]
-                    iteration_train_examples += chain.from_iterable(
-                        ray.get(futures)
-                    )
+                with tqdm(
+                    desc="Self play episodes", total=self.args.numEps
+                ) as bar:
+                    for train_examples in actor_pool.map_unordered(
+                        lambda a, v: a.execute_episode.remote(v),
+                        range(1, self.args.numEps + 1),
+                    ):
+                        iteration_train_examples += train_examples
+                        bar.update(1)
 
                 # save the iteration examples to the history
                 self.train_examples_history.append(iteration_train_examples)

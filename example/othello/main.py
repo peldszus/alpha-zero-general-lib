@@ -18,6 +18,7 @@ args = DotDict(
         "load_model": False,
         "load_folder_file": ("/dev/models/8x100x50", "best.pth.tar"),
         "numItersForTrainExamplesHistory": 20,
+        "nr_actors": 8,  # Number of self play episodes executed in parallel
     }
 )
 

@@ -20,6 +20,7 @@ args = DotDict(
         "load_model": False,
         "load_folder_file": ("/tmp/alpha_zero_general/", "best.pth.tar"),
         "numItersForTrainExamplesHistory": 20,
+        "nr_actors": 2,  # Number of self play episodes executed in parallel
     }
 )
 
