@@ -18,9 +18,41 @@ def test_alpha_zero_player():
     assert action
 
 
+def test_alpha_zero_player_from_checkpoint():
+    game = OthelloGame(6)
+
+    some_net = OthelloNNet(game)
+    folder, filename = "/tmp/", "checkpoint_alpha_zero_player"
+    some_net.save_checkpoint(folder, filename)
+    del some_net
+
+    player = AlphaZeroPlayer(
+        game, OthelloNNet, folder=folder, filename=filename, num_mcts_sims=4
+    )
+    board = game.get_init_board()
+    action = player.play(board)
+    assert action
+
+
 def test_bare_model_player():
     game = OthelloGame(6)
     player = BareModelPlayer(game, OthelloNNet)
+    board = game.get_init_board()
+    action = player.play(board)
+    assert action
+
+
+def test_bare_model_player_from_checkpoint():
+    game = OthelloGame(6)
+
+    some_net = OthelloNNet(game)
+    folder, filename = "/tmp/", "checkpoint_bare_model_player"
+    some_net.save_checkpoint(folder, filename)
+    del some_net
+
+    player = BareModelPlayer(
+        game, OthelloNNet, folder=folder, filename=filename
+    )
     board = game.get_init_board()
     action = player.play(board)
     assert action
