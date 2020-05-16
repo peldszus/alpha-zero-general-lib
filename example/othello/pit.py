@@ -6,7 +6,7 @@ from alpha_zero_general import HumanPlayer  # noqa
 from alpha_zero_general import RandomPlayer  # noqa
 
 from .game import OthelloGame
-from .nnet import OthelloNNet
+from .keras import OthelloNNet
 
 """
 use this script to play any two agents against each other, or play manually with

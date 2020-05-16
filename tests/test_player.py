@@ -7,7 +7,7 @@ from alpha_zero_general import HumanPlayer
 from alpha_zero_general import RandomPlayer
 
 from example.othello.game import OthelloGame
-from example.othello.nnet import OthelloNNet
+from example.othello.keras import OthelloNNet
 
 
 def test_alpha_zero_player():

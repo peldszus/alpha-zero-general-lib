@@ -2,7 +2,7 @@ from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
 
 from .game import OthelloGame
-from .nnet import OthelloNNet
+from .keras import OthelloNNet
 
 args = DotDict(
     {
