@@ -1,4 +1,10 @@
-class NeuralNet:
+"""An abstract base class for the neural network to be used by alpha zero."""
+
+from abc import ABC
+from abc import abstractmethod
+
+
+class NeuralNet(ABC):
     """
     This class specifies the base NeuralNet class. To define your own neural
     network, subclass this class and implement the functions below. The neural
@@ -6,9 +12,13 @@ class NeuralNet:
     the canonical form of the board.
     """
 
+    @abstractmethod
     def __init__(self, game):
-        pass
+        """
+        Initialize the net with the game.
+        """
 
+    @abstractmethod
     def train(self, examples):
         """
         This function trains the neural network with examples obtained from
@@ -20,8 +30,8 @@ class NeuralNet:
                       the given board, and v is its value. The examples has
                       board in its canonical form.
         """
-        pass
 
+    @abstractmethod
     def predict(self, board):
         """
         Input:
@@ -32,17 +42,16 @@ class NeuralNet:
                 game.get_action_size
             v: a float in [-1,1] that gives the value of the current board
         """
-        pass
 
+    @abstractmethod
     def save_checkpoint(self, folder, filename):
         """
         Saves the current neural network (with its parameters) in
         folder/filename
         """
-        pass
 
+    @abstractmethod
     def load_checkpoint(self, folder, filename):
         """
         Loads parameters of the neural network from folder/filename
         """
-        pass

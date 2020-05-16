@@ -36,7 +36,7 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [x] Use travis-ci.org tests
 * [x] Coverage report on codecov.org
 * [x] Use Ray to parallelize self-play
-* [ ] Proper abstract classes for Game and NeuralNet
+* [x] Proper abstract classes for Game and NeuralNet
 * [ ] Make MCTS and model parameters explicit
 * [ ] More documentation
 * [ ] Provide one entrypoint for training and pitting

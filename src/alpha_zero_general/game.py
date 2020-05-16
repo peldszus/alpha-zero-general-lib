@@ -1,4 +1,10 @@
-class Game:
+"""An abstract base class for games to be played by alpha zero."""
+
+from abc import ABC
+from abc import abstractmethod
+
+
+class Game(ABC):
     """
     This class specifies the base Game class. To define your own game, subclass
     this class and implement the functions below. This works when the game is
@@ -7,37 +13,34 @@ class Game:
     Use 1 for player1 and -1 for player2.
     """
 
-    def __init__(self):
-        pass
-
+    @abstractmethod
     def get_init_board(self):
         """
         Returns:
             startBoard: a representation of the board (ideally this is the form
                         that will be the input to your neural network)
         """
-        pass
 
+    @abstractmethod
     def get_board_size(self):
         """
         Returns:
             (x,y): a tuple of board dimensions
         """
-        pass
 
+    @abstractmethod
     def get_action_size(self):
         """
         Returns:
             actionSize: number of all possible actions
         """
-        pass
 
+    @abstractmethod
     def get_action_names(self):
         """
         Returns:
             action_names: a dictionary mapping action names to actions
         """
-        pass
 
     def get_action_prompt(self):
         """
@@ -46,6 +49,7 @@ class Game:
         """
         return "Your move > "
 
+    @abstractmethod
     def get_next_state(self, board, player, action):
         """
         Input:
@@ -57,8 +61,8 @@ class Game:
             nextBoard: board after applying action
             nextPlayer: player who plays in the next turn (should be -player)
         """
-        pass
 
+    @abstractmethod
     def get_valid_moves(self, board, player):
         """
         Input:
@@ -70,8 +74,8 @@ class Game:
                         moves that are valid from the current board and player,
                         0 for invalid moves
         """
-        pass
 
+    @abstractmethod
     def get_game_ended(self, board, player):
         """
         Input:
@@ -81,10 +85,9 @@ class Game:
         Returns:
             r: 0 if game has not ended. 1 if player won, -1 if player lost,
                small non-zero value for draw.
-
         """
-        pass
 
+    @abstractmethod
     def get_canonical_form(self, board, player):
         """
         Input:
@@ -99,8 +102,8 @@ class Game:
                             board as is. When the player is black, we can invert
                             the colors and return the board.
         """
-        pass
 
+    @abstractmethod
     def get_symmetries(self, board, pi):
         """
         Input:
@@ -112,8 +115,8 @@ class Game:
                        form of the board and the corresponding pi vector. This
                        is used when training the neural network from examples.
         """
-        pass
 
+    @abstractmethod
     def string_representation(self, board):
         """
         Input:
@@ -123,4 +126,3 @@ class Game:
             boardString: a quick conversion of board to a string format.
                          Required by MCTS for hashing.
         """
-        pass
