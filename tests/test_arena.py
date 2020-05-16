@@ -11,4 +11,7 @@ def test_arena():
     arena = Arena(
         player1.play, player2.play, game, display=OthelloGame.display
     )
-    print(arena.play_games(10, verbose=True))
+
+    number_of_games = 10
+    one_won, two_won, draws = arena.play_games(number_of_games, verbose=True)
+    assert one_won + two_won + draws == number_of_games
