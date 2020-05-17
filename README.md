@@ -20,28 +20,40 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 ## TODO list
 
+Library:
 * [x] Poetry based build that works as library
+* [x] Add some tests
+* [x] Use travis-ci.org tests
+* [x] Coverage report on codecov.org
+* [x] Make sure it works
+* [ ] More documentation
+* [ ] Provide one entrypoint for training and pitting
+* [ ] A first pypi release
+
+Refactor:
 * [x] Use `tqdm` for progress bars
 * [x] Pythonic renaming of modules
 * [x] Pythonic renaming of method names
 * [x] Pythonic renaming of variables names
 * [x] Black formatting, flake8
 * [x] Fix inline comments
-* [x] Make sure it works
+* [x] Fix all flake8 issues
+* [x] Proper abstract classes for Game and NeuralNet
+* [ ] Make MCTS and model parameters explicit
+
+General player classes:
 * [x] AlphaZeroPlayer out of pit code
 * [x] BareModelPlayer
 * [x] HumanPlayer: named action mapping
-* [x] Fix all flake8 issues
-* [x] Add some tests
-* [x] Use travis-ci.org tests
-* [x] Coverage report on codecov.org
-* [x] Use Ray to parallelize self-play
-* [x] Proper abstract classes for Game and NeuralNet
-* [ ] Make MCTS and model parameters explicit
-* [ ] More documentation
-* [ ] Provide one entrypoint for training and pitting
+
+Asynchronous & parallel processing:
+* [x] Ray step 1: Use Ray to parallelize self-play
+* [ ] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
+* [ ] Ray step 3: Make self-play and training fully async
+
+New features:
 * [ ] Tournaments and ELO scores
-* [ ] A first pypi release
+
 
 
 ## Contributors and Credits
