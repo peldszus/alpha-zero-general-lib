@@ -2,13 +2,24 @@
 Generic player classes.
 """
 
+from abc import ABC
+from abc import abstractmethod
+
 import numpy as np
 
 from .mcts import MCTS
 from .utils import DotDict
 
 
-class RandomPlayer:
+class Player(ABC):
+    """The base player class."""
+
+    @abstractmethod
+    def play(self, board):
+        """Returns the action of the player for the given board."""
+
+
+class RandomPlayer(Player):
     """Selects a random valid action."""
 
     def __init__(self, game):
@@ -23,7 +34,7 @@ class RandomPlayer:
         return action
 
 
-class HumanPlayer:
+class HumanPlayer(Player):
     """Selects an actions based on human input."""
 
     def __init__(self, game):
@@ -47,7 +58,7 @@ class HumanPlayer:
         return action
 
 
-class GreedyPlayer:
+class GreedyPlayer(Player):
     """
     Selects the action with the best immediate outcome according to
     a heuristic evaluation function game.get_score().
@@ -70,7 +81,7 @@ class GreedyPlayer:
         return candidates[0][1]
 
 
-class BareModelPlayer:
+class BareModelPlayer(Player):
     """
     Selects the actions with the highest probability according to the model
     without simulating future steps using MCTS.
@@ -91,7 +102,7 @@ class BareModelPlayer:
         return np.argmax(pi * valids)
 
 
-class AlphaZeroPlayer:
+class AlphaZeroPlayer(Player):
     """
     Selects the actions with the best outcome according to the model when
     simulating future steps using MCTS.

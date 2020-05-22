@@ -7,6 +7,7 @@ from .player import AlphaZeroPlayer
 from .player import BareModelPlayer
 from .player import GreedyPlayer
 from .player import HumanPlayer
+from .player import Player
 from .player import RandomPlayer
 from .utils import DotDict
 
@@ -19,6 +20,7 @@ __all__ = [
     "Game",
     "GreedyPlayer",
     "HumanPlayer",
+    "Player",
     "MCTS",
     "NeuralNet",
     "RandomPlayer",
