@@ -11,6 +11,8 @@ from .player import Player
 from .player import RandomPlayer
 from .utils import DotDict
 
+from .league import League  # isort:skip (League must be imported after Player)
+
 __all__ = [
     "AlphaZeroPlayer",
     "BareModelPlayer",
@@ -19,6 +21,7 @@ __all__ = [
     "DotDict",
     "Game",
     "GreedyPlayer",
+    "League",
     "HumanPlayer",
     "Player",
     "MCTS",
