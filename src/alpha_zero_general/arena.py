@@ -65,7 +65,7 @@ class Arena:
             self.display(board)
         return current_player * self.game.get_game_ended(board, current_player)
 
-    def play_games(self, num, verbose=False):
+    def play_games(self, num, verbose=False, quiet=False):
         """
         Plays num games in which player1 starts num/2 games and player2 starts
         num/2 games.
@@ -80,7 +80,9 @@ class Arena:
         one_won = 0
         two_won = 0
         draws = 0
-        for _ in tqdm(range(num), desc="Arena.play_games (Player 1)"):
+        for _ in tqdm(
+            range(num), desc="Arena.play_games (Player 1)", disable=quiet
+        ):
             game_result = self.play_game(verbose=verbose)
             if game_result == 1:
                 one_won += 1
@@ -91,7 +93,9 @@ class Arena:
 
         self.player1, self.player2 = self.player2, self.player1
 
-        for _ in tqdm(range(num), desc="Arena.play_games (Player 2)"):
+        for _ in tqdm(
+            range(num), desc="Arena.play_games (Player 2)", disable=quiet
+        ):
             game_result = self.play_game(verbose=verbose)
             if game_result == -1:
                 one_won += 1
