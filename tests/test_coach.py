@@ -1,3 +1,4 @@
+import os
 from collections import Counter
 
 from alpha_zero_general import Coach
@@ -34,5 +35,33 @@ def test_coach(capsys):
     counter = Counter(out.splitlines())
     assert counter["------ITER 1------"] == 1
     assert counter["------ITER 2------"] == 1
-    assert counter["PITTING AGAINST PREVIOUS VERSION"] == 2
-    assert counter["ACCEPTING NEW MODEL"] + counter["REJECTING NEW MODEL"] == 2
+    assert counter["PITTING AGAINST PREVIOUS VERSION"] == args.numIters
+    assert (
+        counter["ACCEPTING NEW MODEL"] + counter["REJECTING NEW MODEL"]
+        == args.numIters
+    )
+
+
+def test_coach_save_and_load_train_examples():
+    # save
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    coach = Coach(game, nnet, args)
+    train_examples = [
+        (game.get_init_board(), [0.0] * game.get_action_size(), 1)
+    ]
+    coach.train_examples_history.append(train_examples)
+    coach.save_train_examples("test")
+    assert os.path.isfile(
+        os.path.join(args.checkpoint, "checkpoint_test.pth.tar.examples")
+    )
+
+    # load
+    coach.train_examples_history = []
+    coach.args.load_folder_file = (
+        coach.args.checkpoint,
+        "checkpoint_test.pth.tar",
+    )
+    coach.load_train_examples()
+    history = coach.train_examples_history
+    assert str(history) == str([train_examples])
