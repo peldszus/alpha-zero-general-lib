@@ -57,7 +57,7 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [ ] Store training examples per iteration to reduce memory intense data duplication
 
 **New features:**
-* [ ] League evaluations with ELO scores
+* [x] League evaluations with ELO scores
 
 
 
