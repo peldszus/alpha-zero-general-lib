@@ -13,6 +13,7 @@ install:
   - poetry install -vvv
 before_script:
   - pip install tensorflow==2.*
+  - rm -rf /tmp/alpha_zero_general/
 script:
   - pytest tests --cov src/ --cov-report=xml\:coverage.xml --cov-report term-missing -vvv
 after_script: cd ~
