@@ -32,7 +32,4 @@ if __name__ == "__main__":
         )
 
     coach = Coach(game, nnet, args)
-    if args.load_model:
-        print("Load trainExamples from file")
-        coach.load_train_examples()
     coach.learn()

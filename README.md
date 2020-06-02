@@ -55,6 +55,7 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 **Improvements:**
 * [ ] Store all models, if accepted or not
 * [ ] Store training examples per iteration to reduce memory intense data duplication
+* [ ] Be able to continue training
 
 **New features:**
 * [x] League evaluations with ELO scores

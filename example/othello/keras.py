@@ -88,6 +88,12 @@ class KerasNetWrapper(NeuralNet):
         filepath = os.path.join(folder, filename)
         self.model.load_weights(filepath)
 
+    def get_weights(self):
+        return self.model.get_weights()
+
+    def set_weights(self, weights):
+        self.model.set_weights(weights)
+
 
 class OthelloNNet(KerasNetWrapper):
     @staticmethod

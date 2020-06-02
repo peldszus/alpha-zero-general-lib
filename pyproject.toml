@@ -25,13 +25,17 @@ pylint = "^2.5.0"
 pytest = "^5.4.1"
 pytest-cov = "^2.8.1"
 
+[tool.poetry.scripts]
+alpha_zero_train = 'alpha_zero_general.scripts:train'
+alpha_zero_pit = 'alpha_zero_general.scripts:pit'
+
 [tool.black]
 line-length = 79
 target_version = ["py37"]
 exclude = "\\.git|env"
 
 [tool.isort]
-known_third_party = ["alpha_zero_general", "cachetools", "elote", "numpy", "ray", "tqdm"]
+known_third_party = ["alpha_zero_general", "cachetools", "elote", "numpy", "pytest", "ray", "tqdm"]
 line_length = 79
 force_single_line = true
 multi_line_output = 3

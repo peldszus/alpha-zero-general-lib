@@ -55,3 +55,15 @@ class NeuralNet(ABC):
         """
         Loads parameters of the neural network from folder/filename
         """
+
+    @abstractmethod
+    def get_weights(self):
+        """
+        Returns the weights of the neural network.
+        """
+
+    @abstractmethod
+    def set_weights(self, weights):
+        """
+        Sets the given weights to the neural network.
+        """
