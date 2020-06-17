@@ -176,7 +176,7 @@ class ReplayBuffer:
             Pickler(f).dump(examples)
 
 
-@ray.remote(num_gpus=1)
+@ray.remote
 class ModelTrainer:
     def __init__(
         self,
@@ -283,6 +283,7 @@ class Coach:
         self.nnet_class = nnet.__class__
         self.args = args
         self.pit_against_old_model = pit_against_old_model
+        self.request_gpu = self.nnet.request_gpu()
 
     def learn(self):
         """
@@ -327,10 +328,9 @@ class Coach:
             )
             for _ in range(self.args.nr_actors)
         ]
-        # model_trainer = ModelTrainer.options(
-        #     num_gpus=1 if self.nnet.model.args.cuda else 0
-        # )
-        model_trainer = ModelTrainer.remote(
+        model_trainer = ModelTrainer.options(
+            num_gpus=1 if self.request_gpu else 0
+        ).remote(
             replay_buffer,
             weight_storage,
             deepcopy(self.game),

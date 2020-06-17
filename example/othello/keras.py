@@ -4,6 +4,7 @@ import numpy as np
 from alpha_zero_general import DotDict
 from alpha_zero_general import NeuralNet
 
+import tensorflow as tf
 from tensorflow.keras.layers import Activation
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Conv2D
@@ -19,9 +20,9 @@ args = DotDict(
     {
         "lr": 0.001,
         "dropout": 0.3,
-        "epochs": 10,
+        "epochs": 1,
         "batch_size": 64,
-        "cuda": True,
+        "cuda": tf.test.is_gpu_available(),
         "num_channels": 512,
     }
 )
@@ -29,8 +30,9 @@ args = DotDict(
 
 class KerasNetWrapper(NeuralNet):
     def __init__(self, game):
+        self.args = args
         self.model = self.get_model(
-            game.get_board_size(), game.get_action_size(), args,
+            game.get_board_size(), game.get_action_size(), self.args,
         )
 
     @staticmethod
@@ -93,6 +95,9 @@ class KerasNetWrapper(NeuralNet):
 
     def set_weights(self, weights):
         self.model.set_weights(weights)
+
+    def request_gpu(self):
+        return self.args.cuda
 
 
 class OthelloNNet(KerasNetWrapper):

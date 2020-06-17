@@ -67,3 +67,9 @@ class NeuralNet(ABC):
         """
         Sets the given weights to the neural network.
         """
+
+    @abstractmethod
+    def request_gpu(self):
+        """
+        Returns True if a gpu should be used, otherwise False.
+        """
