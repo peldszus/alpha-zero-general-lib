@@ -15,12 +15,8 @@ from .mcts import MCTS
 from .utils import DotDict
 
 # *** Async feature ***
-# TODO:
 # - Enable continuing training (model)
-# - Add option to not save model early models
-# - Fix get_examples() takes too long over ray
 # - Adjust tests
-#
 
 
 @ray.remote
@@ -141,18 +137,12 @@ class ReplayBuffer:
         self.folder = folder
 
     def get_examples(self):
-        """Returns the examples from the history of played games."""
-        examples = np.array(
-            [example for game in self.history for example in game]
-        )
-        # TODO: Returning the examples actually takes quite long, maybe because ray needs
-        # to pickle and unpickle up to 2000 games (500mb)...?
-        # > Done fetching 522472 examples in 368.90213775634766 seconds (1416 e/s).
-        return examples
+        """Returns a list of (ray object ids of) examples from the history of played games."""
+        return list(self.history)
 
     def add_game_examples(self, examples):
         """Add examples of a recent game."""
-        self.history.append(examples)
+        self.history.append(ray.put(examples))
         self.games_played += 1
         self.save(examples, self.games_played)
 
@@ -170,7 +160,8 @@ class ReplayBuffer:
         for filename in sorted(filenames)[-self.use_last_n_games :]:
             print(f"Loading from {filename}...")
             with open(filename, "rb") as f:
-                self.history.append(Unpickler(f).load())
+                examples = Unpickler(f).load()
+                self.history.append(ray.put(examples))
         print("Done loading.")
         return self.games_played
 
@@ -195,6 +186,7 @@ class ModelTrainer:
         nnet_class,
         args,
         pit_against_old_model=False,
+        save_model_from_revision_n_on=500,
     ):
         self.replay_buffer = replay_buffer
         self.weight_storage = weight_storage
@@ -203,8 +195,8 @@ class ModelTrainer:
         self.pit_against_old_model = pit_against_old_model
         self.nnet_class = nnet_class
         self.nnet = None
-        self.pnet = None
         self.model_revision = -1
+        self.save_model_from_revision_n_on = save_model_from_revision_n_on
 
     def start(self):
         # get initial weights
@@ -224,9 +216,10 @@ class ModelTrainer:
         while True:
             old_weights = self.nnet.get_weights()
             print(f"Training next model revision {self.model_revision}...")
-            print("Fetching last examples...")
             t1 = time.time()
-            train_examples = ray.get(self.replay_buffer.get_examples.remote())
+            game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
+            games = ray.get(game_object_ids)
+            train_examples = [example for game in games for example in game]
             t = time.time() - t1
             print(
                 f"Done fetching {len(train_examples)} examples in {t} seconds ({int(len(train_examples)/t)} e/s)."
@@ -237,10 +230,12 @@ class ModelTrainer:
             self.model_revision = ray.get(
                 self.weight_storage.set_weights.remote(weights)
             )
-            self.nnet.save_checkpoint(
-                folder=self.args.checkpoint,
-                filename=f"model_{self.model_revision:05d}",
-            )
+
+            if self.model_revision >= self.save_model_from_revision_n_on:
+                self.nnet.save_checkpoint(
+                    folder=self.args.checkpoint,
+                    filename=f"model_{self.model_revision:05d}",
+                )
 
             if self.pit_against_old_model:
                 if self.wins_against_old_model(old_weights):
@@ -303,6 +298,9 @@ class Coach:
         )
 
         if self.args.load_model:
+            print(
+                f"Loading initial model from checkpoint {self.args.load_folder_file}..."
+            )
             self.nnet.load_checkpoint(
                 folder=self.args.load_folder_file[0],
                 filename=self.args.load_folder_file[1],
@@ -311,7 +309,6 @@ class Coach:
         # initialize components
         ray.init(ignore_reinit_error=True)
 
-        # TODO: be able to continue training
         weight_storage = WeightStorage.remote(self.nnet.get_weights())
         del self.nnet
 

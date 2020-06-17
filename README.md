@@ -48,13 +48,14 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 **Asynchronous & parallel processing:**
 * [x] Ray step 1: Use Ray to parallelize self-play
-* [ ] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
-* [ ] Ray step 3: Make self-play and training fully async
+* [x] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
+* [x] Ray step 3: Make self-play and training fully async
 * [ ] Ray step 4: Parallelize the arena play during league execution
+* [ ] Add parameter to control selfplay vs training
 
 **Improvements:**
-* [ ] Store all models, if accepted or not
-* [ ] Store training examples per iteration to reduce memory intense data duplication
+* [x] Store all models, if accepted or not
+* [x] Store training examples per game to reduce data duplication
 * [ ] Be able to continue training
 
 **New features:**

@@ -1,8 +1,11 @@
 import os
+import tempfile
 
 import pytest
+import ray
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
+from alpha_zero_general.coach import WeightStorage
 
 from example.othello.game import OthelloGame
 from example.othello.keras import OthelloNNet
@@ -26,23 +29,30 @@ args = DotDict(
 )
 
 
-def test_coach(capsys):
-    game = OthelloGame(6)
-    nnet = OthelloNNet(game)
-    coach = Coach(game, nnet, args, pit_against_old_model=True)
-    coach.learn()
-    out, _err = capsys.readouterr()
-    # counter = Counter(out.splitlines())
-    # assert counter["------ITER 1------"] == 1
-    # assert counter["------ITER 2------"] == 1
-    # assert counter["PITTING AGAINST PREVIOUS VERSION"] == args.numIters
-    # assert (
-    #     counter["ACCEPTING NEW MODEL"] + counter["REJECTING NEW MODEL"]
-    #     == args.numIters
-    # )
-    print(out)
-    assert "PITTING AGAINST PREVIOUS VERSION" in out
-    assert "ACCEPTING NEW MODEL" in out or "REJECTING NEW MODEL" in out
+def test_weight_storage():
+    init_weights = [0, 0]
+    init_revision = 1
+    ray.init()
+    w = WeightStorage.remote(init_weights, revision=init_revision)
+    assert ray.get(w.get_revision.remote()) == init_revision
+    assert ray.get(w.get_weights.remote()) == (init_weights, init_revision)
+    next_weights = [1, 1]
+    next_revision = ray.get(w.set_weights.remote(next_weights))
+    assert next_revision == init_revision + 1
+    assert ray.get(w.get_weights.remote()) == (next_weights, next_revision)
+    ray.shutdown()
+
+
+def test_coach_with_pit(capsys):
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        args.checkpoint = tmpdirname
+        game = OthelloGame(6)
+        nnet = OthelloNNet(game)
+        coach = Coach(game, nnet, args, pit_against_old_model=True)
+        coach.learn()
+        out, _err = capsys.readouterr()
+        assert "PITTING AGAINST PREVIOUS VERSION" in out
+        assert "ACCEPTING NEW MODEL" in out or "REJECTING NEW MODEL" in out
 
 
 @pytest.mark.skip()
