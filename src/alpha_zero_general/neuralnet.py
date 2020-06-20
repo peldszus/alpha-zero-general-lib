@@ -29,6 +29,9 @@ class NeuralNet(ABC):
                       (board, pi, v). pi is the MCTS informed policy vector for
                       the given board, and v is its value. The examples has
                       board in its canonical form.
+
+        Returns:
+            pi_loss, v_loss: The losses after training the model using the examples.
         """
 
     @abstractmethod

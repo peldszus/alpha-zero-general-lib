@@ -50,12 +50,14 @@ class KerasNetWrapper(NeuralNet):
         input_boards = np.asarray(input_boards)
         target_pis = np.asarray(target_pis)
         target_vs = np.asarray(target_vs)
-        self.model.fit(
+        history = self.model.fit(
             x=input_boards,
             y=[target_pis, target_vs],
             batch_size=args.batch_size,
             epochs=args.epochs,
+            verbose=0,
         )
+        return history.history["pi_loss"][-1], history.history["v_loss"][-1]
 
     def predict(self, board):
         """

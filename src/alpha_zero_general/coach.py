@@ -9,6 +9,7 @@ from random import shuffle
 
 import numpy as np
 import ray
+from tqdm import tqdm
 
 from .arena import Arena
 from .mcts import MCTS
@@ -20,10 +21,12 @@ from .utils import DotDict
 
 
 @ray.remote
-class SelfPlayActor:
-    def __init__(self, replay_buffer, weight_storage, game, nnet_class, args):
+class SelfPlay:
+    """Actor to execute self play."""
+
+    def __init__(self, replay_buffer, shared_storage, game, nnet_class, args):
         self.replay_buffer = replay_buffer
-        self.weight_storage = weight_storage
+        self.shared_storage = shared_storage
         self.game = game
         self.args = DotDict(args)
         self.nnet = nnet_class(self.game)
@@ -34,7 +37,7 @@ class SelfPlayActor:
         """Start the main self play loop for this actor."""
         while True:
             weights, self.model_revision = ray.get(
-                self.weight_storage.get_weights.remote(self.model_revision)
+                self.shared_storage.get_weights.remote(self.model_revision)
             )
             if weights:
                 self.nnet.set_weights(weights)
@@ -91,24 +94,24 @@ class SelfPlayActor:
 
 
 @ray.remote
-class WeightStorage:
-    """
-    Class which is run in a dedicated thread to store the network weights.
-    """
+class SharedStorage:
+    """Actor to store and provide the most recent network weights and infos."""
 
     def __init__(self, weights, revision=0):
         self.weights = weights
         self.revision = revision
+        self.infos = {
+            "policy_loss": None,
+            "value_loss": None,
+        }
         print(f"Initialized with weights at revision {self.revision}.")
 
     def get_weights(self, revision=0):
         """
         Return the weights and the current revision, if the given revision
-        is older than the current one. Otherwise return None-type weights,
-        to save bandwidth.
+        is older than the current one. Otherwise return None-type weights.
         """
         if revision < self.revision:
-            print("Providing newest weights.")
             return self.weights, self.revision
         else:
             return None, self.revision
@@ -117,20 +120,30 @@ class WeightStorage:
         """Return the current revision of the model weights."""
         return self.revision
 
-    def set_weights(self, weights):
+    def set_weights(self, weights, policy_loss=None, value_loss=None):
         """Set the next revision of the model weights."""
         self.weights = weights
+        if policy_loss:
+            self.set_info("policy_loss", policy_loss)
+        if value_loss:
+            self.set_info("value_loss", value_loss)
         self.revision += 1
         return self.revision
+
+    def get_infos(self):
+        """Returns the stored information dictionary."""
+        return self.infos
+
+    def set_info(self, key, value):
+        """Set or update a value in the information dictionary."""
+        self.infos[key] = value
 
 
 @ray.remote
 class ReplayBuffer:
-    """
-    Class which is run in a dedicated thread to store played games and generate batch.
-    """
+    """Actor to store played games and provide the latest examples for training."""
 
-    def __init__(self, use_last_n_games=2000, folder=None):
+    def __init__(self, use_last_n_games=1000, folder=None):
         self.history = deque([], maxlen=use_last_n_games)
         self.use_last_n_games = use_last_n_games
         self.games_played = 0
@@ -178,10 +191,12 @@ class ReplayBuffer:
 
 @ray.remote
 class ModelTrainer:
+    """Actor to train the model."""
+
     def __init__(
         self,
         replay_buffer,
-        weight_storage,
+        shared_storage,
         game,
         nnet_class,
         args,
@@ -189,7 +204,7 @@ class ModelTrainer:
         save_model_from_revision_n_on=500,
     ):
         self.replay_buffer = replay_buffer
-        self.weight_storage = weight_storage
+        self.shared_storage = shared_storage
         self.game = game
         self.args = DotDict(args)
         self.pit_against_old_model = pit_against_old_model
@@ -202,7 +217,7 @@ class ModelTrainer:
         # get initial weights
         self.nnet = self.nnet_class(self.game)
         weights, self.model_revision = ray.get(
-            self.weight_storage.get_weights.remote(self.model_revision)
+            self.shared_storage.get_weights.remote(self.model_revision)
         )
         self.nnet.set_weights(weights)
 
@@ -215,20 +230,16 @@ class ModelTrainer:
         # train loop
         while True:
             old_weights = self.nnet.get_weights()
-            print(f"Training next model revision {self.model_revision}...")
-            t1 = time.time()
             game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
             games = ray.get(game_object_ids)
             train_examples = [example for game in games for example in game]
-            t = time.time() - t1
-            print(
-                f"Done fetching {len(train_examples)} examples in {t} seconds ({int(len(train_examples)/t)} e/s)."
-            )
             shuffle(train_examples)
-            self.nnet.train(train_examples)
+            policy_loss, value_loss = self.nnet.train(train_examples)
             weights = self.nnet.get_weights()
             self.model_revision = ray.get(
-                self.weight_storage.set_weights.remote(weights)
+                self.shared_storage.set_weights.remote(
+                    weights, policy_loss, value_loss
+                )
             )
 
             if self.model_revision >= self.save_model_from_revision_n_on:
@@ -310,7 +321,7 @@ class Coach:
         # initialize components
         ray.init(ignore_reinit_error=True)
 
-        weight_storage = WeightStorage.remote(self.nnet.get_weights())
+        shared_storage = SharedStorage.remote(self.nnet.get_weights())
         del self.nnet
 
         replay_buffer = ReplayBuffer.remote(
@@ -319,9 +330,9 @@ class Coach:
         ray.get(replay_buffer.load.remote())
 
         self_play_actor_pool = [
-            SelfPlayActor.remote(
+            SelfPlay.remote(
                 replay_buffer,
-                weight_storage,
+                shared_storage,
                 deepcopy(self.game),
                 self.nnet_class,
                 dict(self.args),
@@ -332,7 +343,7 @@ class Coach:
             num_gpus=1 if self.request_gpu else 0
         ).remote(
             replay_buffer,
-            weight_storage,
+            shared_storage,
             deepcopy(self.game),
             self.nnet_class,
             dict(self.args),
@@ -345,22 +356,27 @@ class Coach:
         model_trainer.start.remote()
 
         # wait until all games are played
-        while (
-            ray.get(replay_buffer.get_number_of_games_played.remote())
-            < games_to_play
-        ):
-            # TODO add progress bar here
+        t = tqdm(
+            desc="Self played games",
+            total=games_to_play,
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]",
+        )
+        while True:
+            games_played = ray.get(
+                replay_buffer.get_number_of_games_played.remote()
+            )
+            revision = ray.get(shared_storage.get_revision.remote())
+            infos = ray.get(shared_storage.get_infos.remote())
+            t.set_postfix(
+                model=revision,
+                pi_loss=infos["policy_loss"],
+                v_loss=infos["value_loss"],
+            )
+            t.update(games_played - t.n)
+            if games_played >= games_to_play:
+                break
             time.sleep(0.5)
+        t.close()
 
         # close
         ray.shutdown()
-
-        #         with tqdm(
-        #             desc="Self play episodes", total=self.args.numEps
-        #         ) as bar:
-        #             for train_examples in actor_pool.map_unordered(
-        #                 lambda a, v: a.execute_episode.remote(v),
-        #                 range(1, self.args.numEps + 1),
-        #             ):
-        #                 iteration_train_examples += train_examples
-        #                 bar.update(1)

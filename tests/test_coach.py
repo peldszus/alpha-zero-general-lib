@@ -5,7 +5,7 @@ import pytest
 import ray
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
-from alpha_zero_general.coach import WeightStorage
+from alpha_zero_general.coach import SharedStorage
 
 from example.othello.game import OthelloGame
 from example.othello.keras import OthelloNNet
@@ -29,17 +29,25 @@ args = DotDict(
 )
 
 
-def test_weight_storage():
+def test_shared_storage():
     init_weights = [0, 0]
     init_revision = 1
     ray.init()
-    w = WeightStorage.remote(init_weights, revision=init_revision)
-    assert ray.get(w.get_revision.remote()) == init_revision
-    assert ray.get(w.get_weights.remote()) == (init_weights, init_revision)
+    s = SharedStorage.remote(init_weights, revision=init_revision)
+    assert ray.get(s.get_revision.remote()) == init_revision
+    assert ray.get(s.get_weights.remote()) == (init_weights, init_revision)
     next_weights = [1, 1]
-    next_revision = ray.get(w.set_weights.remote(next_weights))
+    next_revision = ray.get(s.set_weights.remote(next_weights, 0.5, 0.2))
     assert next_revision == init_revision + 1
-    assert ray.get(w.get_weights.remote()) == (next_weights, next_revision)
+    assert ray.get(s.get_weights.remote()) == (next_weights, next_revision)
+    assert ray.get(s.get_infos.remote()) == {
+        "policy_loss": 0.5,
+        "value_loss": 0.2,
+    }
+    assert ray.get(s.get_weights.remote(revision=next_revision + 1)) == (
+        None,
+        next_revision,
+    )
     ray.shutdown()
 
 

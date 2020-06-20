@@ -64,5 +64,5 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 
 ## Contributors and Credits
-* The original version was written by [Surag Nair](https://github.com/suragnair).
-* [Shantanu Thakoor](https://github.com/ShantanuThakoor) and [Megha Jhunjhunwala](https://github.com/jjw-megha) helped with core design and implementation.
+* The original version was written by [Surag Nair](https://github.com/suragnair) and credits go to all contributors of https://github.com/suragnair/alpha-zero-general.
+* The use of ray is inspired by https://github.com/werner-duvaud/muzero-general.
