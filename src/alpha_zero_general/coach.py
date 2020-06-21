@@ -14,10 +14,12 @@ from tqdm import tqdm
 from .arena import Arena
 from .mcts import MCTS
 from .utils import DotDict
+from .utils import parse_game_filename
+from .utils import parse_model_filename
 
 # *** Async feature ***
-# - Enable continuing training (model)
-# - Adjust tests
+# - tests: fix line coverage issue to get full coverage again
+# - tests: replace store test
 
 
 @ray.remote
@@ -167,10 +169,13 @@ class ReplayBuffer:
         """Loads game examples from folder and return the total number of
         games played."""
         print(f"Loading played games from {self.folder}...")
-        filenames = glob.glob(os.path.join(self.folder, "game_*"))
-        self.games_played = len(filenames)
-        # TODO: parse `games_played` out of filename
-        for filename in sorted(filenames)[-self.use_last_n_games :]:
+        filenames = sorted(glob.glob(os.path.join(self.folder, "game_*")))
+        self.games_played = 0
+        if filenames:
+            self.games_played = parse_game_filename(
+                os.path.basename(filenames[-1])
+            )
+        for filename in filenames[-self.use_last_n_games :]:
             print(f"Loading from {filename}...")
             with open(filename, "rb") as f:
                 examples = Unpickler(f).load()
@@ -200,8 +205,9 @@ class ModelTrainer:
         game,
         nnet_class,
         args,
+        selfplay_training_ratio=2.0,
         pit_against_old_model=False,
-        save_model_from_revision_n_on=500,
+        save_model_from_revision_n_on=0,
     ):
         self.replay_buffer = replay_buffer
         self.shared_storage = shared_storage
@@ -211,6 +217,7 @@ class ModelTrainer:
         self.nnet_class = nnet_class
         self.nnet = None
         self.model_revision = -1
+        self.selfplay_training_ratio = selfplay_training_ratio
         self.save_model_from_revision_n_on = save_model_from_revision_n_on
 
     def start(self):
@@ -221,14 +228,23 @@ class ModelTrainer:
         )
         self.nnet.set_weights(weights)
 
-        # wait for the first played games
-        while (
-            ray.get(self.replay_buffer.get_number_of_games_played.remote()) < 1
-        ):
-            time.sleep(0.2)
-
         # train loop
         while True:
+            # wait with training according to selfplay / training ratio
+            games_played, model_revision = ray.get(
+                [
+                    self.replay_buffer.get_number_of_games_played.remote(),
+                    self.shared_storage.get_revision.remote(),
+                ]
+            )
+            if (
+                games_played / max(1, model_revision)
+                <= self.selfplay_training_ratio
+            ):
+                time.sleep(0.5)
+                continue
+
+            # train a new model revision
             old_weights = self.nnet.get_weights()
             game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
             games = ray.get(game_object_ids)
@@ -251,7 +267,8 @@ class ModelTrainer:
             if self.pit_against_old_model:
                 if self.wins_against_old_model(old_weights):
                     self.nnet.save_checkpoint(
-                        folder=self.args.checkpoint, filename="model_best"
+                        folder=self.args.checkpoint,
+                        filename=f"model_{self.model_revision:05d}_best",
                     )
                 else:
                     self.nnet.set_weights(old_weights)
@@ -309,10 +326,12 @@ class Coach:
             self.args.numEps * self.args.numItersForTrainExamplesHistory
         )
 
+        revision = 0
         if self.args.load_model:
             print(
                 f"Loading initial model from checkpoint {self.args.load_folder_file}..."
             )
+            revision = parse_model_filename(self.args.load_folder_file[1])
             self.nnet.load_checkpoint(
                 folder=self.args.load_folder_file[0],
                 filename=self.args.load_folder_file[1],
@@ -321,7 +340,9 @@ class Coach:
         # initialize components
         ray.init(ignore_reinit_error=True)
 
-        shared_storage = SharedStorage.remote(self.nnet.get_weights())
+        shared_storage = SharedStorage.remote(
+            self.nnet.get_weights(), revision=revision
+        )
         del self.nnet
 
         replay_buffer = ReplayBuffer.remote(
@@ -362,11 +383,13 @@ class Coach:
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]",
         )
         while True:
-            games_played = ray.get(
-                replay_buffer.get_number_of_games_played.remote()
+            games_played, revision, infos = ray.get(
+                [
+                    replay_buffer.get_number_of_games_played.remote(),
+                    shared_storage.get_revision.remote(),
+                    shared_storage.get_infos.remote(),
+                ]
             )
-            revision = ray.get(shared_storage.get_revision.remote())
-            infos = ray.get(shared_storage.get_infos.remote())
             t.set_postfix(
                 model=revision,
                 pi_loss=infos["policy_loss"],

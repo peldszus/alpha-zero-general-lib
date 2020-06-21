@@ -81,8 +81,6 @@ class KerasNetWrapper(NeuralNet):
                 )
             )
             os.mkdir(folder)
-        else:
-            print("Checkpoint Directory exists! ")
         self.model.save_weights(filepath)
 
     def load_checkpoint(
