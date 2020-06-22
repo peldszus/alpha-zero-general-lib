@@ -1,10 +1,10 @@
 import os
 import tempfile
 
-import pytest
 import ray
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
+from alpha_zero_general.coach import ReplayBuffer
 from alpha_zero_general.coach import SharedStorage
 
 from example.othello.game import OthelloGame
@@ -51,6 +51,39 @@ def test_shared_storage():
     ray.shutdown()
 
 
+def test_replay_buffer():
+    def mock_game_examples(game=1, size=10):
+        return [game] * size
+
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        ray.init()
+        r = ReplayBuffer.remote(use_last_n_games=5, folder=tmpdirname)
+        assert ray.get(r.get_number_of_games_played.remote()) == 0
+        game_1 = mock_game_examples(game=1)
+        r.add_game_examples.remote(game_1)
+        assert ray.get(r.get_number_of_games_played.remote()) == 1
+        assert os.path.isfile(os.path.join(tmpdirname, f"game_{1:08d}"))
+        assert ray.get(ray.get(r.get_examples.remote())) == [game_1]
+        for game in range(2, 7):
+            r.add_game_examples.remote(mock_game_examples(game=game))
+        assert ray.get(r.get_number_of_games_played.remote()) == 6
+        games = ray.get(ray.get(r.get_examples.remote()))
+        assert len(games) == 5
+        assert games[0][0] == 2
+        assert games[-1][0] == 6
+        assert os.path.isfile(os.path.join(tmpdirname, f"game_{6:08d}"))
+        ray.shutdown()
+
+        ray.init()
+        r = ReplayBuffer.remote(use_last_n_games=5, folder=tmpdirname)
+        assert ray.get(r.load.remote()) == 6
+        games = ray.get(ray.get(r.get_examples.remote()))
+        assert len(games) == 5
+        assert games[0][0] == 2
+        assert games[-1][0] == 6
+        ray.shutdown()
+
+
 def test_coach_with_pit(capsys):
     with tempfile.TemporaryDirectory() as tmpdirname:
         args.checkpoint = tmpdirname
@@ -61,29 +94,3 @@ def test_coach_with_pit(capsys):
         out, _err = capsys.readouterr()
         assert "PITTING AGAINST PREVIOUS VERSION" in out
         assert "ACCEPTING NEW MODEL" in out or "REJECTING NEW MODEL" in out
-
-
-@pytest.mark.skip()
-def test_coach_save_and_load_train_examples():
-    # save
-    game = OthelloGame(6)
-    nnet = OthelloNNet(game)
-    coach = Coach(game, nnet, args)
-    train_examples = [
-        (game.get_init_board(), [0.0] * game.get_action_size(), 1)
-    ]
-    coach.train_examples_history.append(train_examples)
-    coach.save_train_examples("test")
-    assert os.path.isfile(
-        os.path.join(args.checkpoint, "checkpoint_test.pth.tar.examples")
-    )
-
-    # load
-    coach.train_examples_history = []
-    coach.args.load_folder_file = (
-        coach.args.checkpoint,
-        "checkpoint_test.pth.tar",
-    )
-    coach.load_train_examples()
-    history = coach.train_examples_history
-    assert str(history) == str([train_examples])
