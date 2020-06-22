@@ -92,5 +92,6 @@ def test_coach_with_pit(capsys):
         coach = Coach(game, nnet, args, pit_against_old_model=True)
         coach.learn()
         out, _err = capsys.readouterr()
+        print(out)
         assert "PITTING AGAINST PREVIOUS VERSION" in out
         assert "ACCEPTING NEW MODEL" in out or "REJECTING NEW MODEL" in out
