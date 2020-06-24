@@ -252,26 +252,24 @@ class ModelTrainer:
             shuffle(train_examples)
             policy_loss, value_loss = self.nnet.train(train_examples)
             weights = self.nnet.get_weights()
-            self.model_revision = ray.get(
-                self.shared_storage.set_weights.remote(
-                    weights, policy_loss, value_loss
-                )
-            )
 
-            if self.model_revision >= self.save_model_from_revision_n_on:
-                self.nnet.save_checkpoint(
-                    folder=self.args.checkpoint,
-                    filename=f"model_{self.model_revision:05d}",
+            if self.pit_against_old_model and not self.wins_against_old_model(
+                old_weights
+            ):
+                # reject the model
+                self.nnet.set_weights(old_weights)
+                continue
+            else:
+                self.model_revision = ray.get(
+                    self.shared_storage.set_weights.remote(
+                        weights, policy_loss, value_loss
+                    )
                 )
-
-            if self.pit_against_old_model:
-                if self.wins_against_old_model(old_weights):
+                if self.model_revision >= self.save_model_from_revision_n_on:
                     self.nnet.save_checkpoint(
                         folder=self.args.checkpoint,
-                        filename=f"model_{self.model_revision:05d}_best",
+                        filename=f"model_{self.model_revision:05d}",
                     )
-                else:
-                    self.nnet.set_weights(old_weights)
 
     def wins_against_old_model(self, old_weights):
         """Returns True if the current model won pitting against the last one."""
