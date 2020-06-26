@@ -41,6 +41,7 @@ def test_shared_storage():
     assert next_revision == init_revision + 1
     assert ray.get(s.get_weights.remote()) == (next_weights, next_revision)
     assert ray.get(s.get_infos.remote()) == {
+        "trained_enough": False,
         "policy_loss": 0.5,
         "value_loss": 0.2,
     }
@@ -48,6 +49,8 @@ def test_shared_storage():
         None,
         next_revision,
     )
+    ray.get(s.set_info.remote("trained_enough", True))
+    assert ray.get(s.trained_enough.remote()) is True
     ray.shutdown()
 
 
@@ -57,7 +60,8 @@ def test_replay_buffer():
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         ray.init()
-        r = ReplayBuffer.remote(use_last_n_games=5, folder=tmpdirname)
+
+        r = ReplayBuffer.remote(games_to_use=5, folder=tmpdirname)
         assert ray.get(r.get_number_of_games_played.remote()) == 0
         game_1 = mock_game_examples(game=1)
         r.add_game_examples.remote(game_1)
@@ -72,15 +76,26 @@ def test_replay_buffer():
         assert games[0][0] == 2
         assert games[-1][0] == 6
         assert os.path.isfile(os.path.join(tmpdirname, f"game_{6:08d}"))
-        ray.shutdown()
 
-        ray.init()
-        r = ReplayBuffer.remote(use_last_n_games=5, folder=tmpdirname)
+        r = ReplayBuffer.remote(games_to_use=5, folder=tmpdirname)
         assert ray.get(r.load.remote()) == 6
         games = ray.get(ray.get(r.get_examples.remote()))
         assert len(games) == 5
         assert games[0][0] == 2
         assert games[-1][0] == 6
+
+        r = ReplayBuffer.remote(
+            games_to_play=5, games_to_use=5, folder=tmpdirname
+        )
+        assert ray.get(r.load.remote()) == 6
+        assert ray.get(r.played_enough.remote()) is True
+
+        r = ReplayBuffer.remote(
+            games_to_play=10, games_to_use=5, folder=tmpdirname
+        )
+        assert ray.get(r.load.remote()) == 6
+        assert ray.get(r.played_enough.remote()) is False
+
         ray.shutdown()
 
 

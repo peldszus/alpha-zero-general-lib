@@ -17,10 +17,6 @@ from .utils import DotDict
 from .utils import parse_game_filename
 from .utils import parse_model_filename
 
-# *** Async feature ***
-# - tests: fix line coverage issue to get full coverage again
-# - tests: replace store test
-
 
 @ray.remote
 class SelfPlay:
@@ -36,8 +32,8 @@ class SelfPlay:
         self.model_revision = -1
 
     def start(self):
-        """Start the main self play loop for this actor."""
-        while True:
+        """Start the main self play loop for this actor and close when done."""
+        while not ray.get(self.replay_buffer.played_enough.remote()):
             weights, self.model_revision = ray.get(
                 self.shared_storage.get_weights.remote(self.model_revision)
             )
@@ -103,6 +99,7 @@ class SharedStorage:
         self.weights = weights
         self.revision = revision
         self.infos = {
+            "trained_enough": False,
             "policy_loss": None,
             "value_loss": None,
         }
@@ -140,14 +137,19 @@ class SharedStorage:
         """Set or update a value in the information dictionary."""
         self.infos[key] = value
 
+    def trained_enough(self):
+        """Returns true if the last iteration of training is done."""
+        return self.infos["trained_enough"]
+
 
 @ray.remote
 class ReplayBuffer:
     """Actor to store played games and provide the latest examples for training."""
 
-    def __init__(self, use_last_n_games=1000, folder=None):
-        self.history = deque([], maxlen=use_last_n_games)
-        self.use_last_n_games = use_last_n_games
+    def __init__(self, games_to_play=1000, games_to_use=1000, folder=None):
+        self.history = deque([], maxlen=games_to_use)
+        self.games_to_play = games_to_play
+        self.games_to_use = games_to_use
         self.games_played = 0
         self.folder = folder
 
@@ -165,6 +167,10 @@ class ReplayBuffer:
         """Return the number of games played."""
         return self.games_played
 
+    def played_enough(self):
+        """Returns true if all the number of requested games has been played."""
+        return self.games_played >= self.games_to_play
+
     def load(self):
         """Loads game examples from folder and return the total number of
         games played."""
@@ -175,7 +181,7 @@ class ReplayBuffer:
             self.games_played = parse_game_filename(
                 os.path.basename(filenames[-1])
             )
-        for filename in filenames[-self.use_last_n_games :]:
+        for filename in filenames[-self.games_to_use :]:
             print(f"Loading from {filename}...")
             with open(filename, "rb") as f:
                 examples = Unpickler(f).load()
@@ -221,6 +227,7 @@ class ModelTrainer:
         self.save_model_from_revision_n_on = save_model_from_revision_n_on
 
     def start(self):
+        """Start the main training loop and close when done."""
         # get initial weights
         self.nnet = self.nnet_class(self.game)
         weights, self.model_revision = ray.get(
@@ -228,8 +235,9 @@ class ModelTrainer:
         )
         self.nnet.set_weights(weights)
 
-        # train loop
-        while True:
+        # train loop, we train as long as we play
+        while not ray.get(self.replay_buffer.played_enough.remote()):
+
             # wait with training according to selfplay / training ratio
             games_played, model_revision = ray.get(
                 [
@@ -270,6 +278,9 @@ class ModelTrainer:
                         folder=self.args.checkpoint,
                         filename=f"model_{self.model_revision:05d}",
                     )
+
+        # close
+        ray.get(self.shared_storage.set_info.remote("trained_enough", True))
 
     def wins_against_old_model(self, old_weights):
         """Returns True if the current model won pitting against the last one."""
@@ -344,7 +355,9 @@ class Coach:
         del self.nnet
 
         replay_buffer = ReplayBuffer.remote(
-            use_last_n_games=games_to_use, folder=self.args.checkpoint,
+            games_to_play=games_to_play,
+            games_to_use=games_to_use,
+            folder=self.args.checkpoint,
         )
         ray.get(replay_buffer.load.remote())
 
@@ -380,7 +393,14 @@ class Coach:
             total=games_to_play,
             bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]",
         )
-        while True:
+        while not all(
+            ray.get(
+                [
+                    replay_buffer.played_enough.remote(),
+                    shared_storage.trained_enough.remote(),
+                ]
+            )
+        ):
             games_played, revision, infos = ray.get(
                 [
                     replay_buffer.get_number_of_games_played.remote(),
@@ -394,8 +414,6 @@ class Coach:
                 v_loss=infos["value_loss"],
             )
             t.update(games_played - t.n)
-            if games_played >= games_to_play:
-                break
             time.sleep(0.5)
         t.close()
 
