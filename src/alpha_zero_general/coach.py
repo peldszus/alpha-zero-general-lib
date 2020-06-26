@@ -1,3 +1,7 @@
+"""
+An asynchronous implementation of the general alpha-zero algorithm.
+"""
+
 import glob
 import os
 import time
@@ -202,7 +206,18 @@ class ReplayBuffer:
 
 @ray.remote
 class ModelTrainer:
-    """Actor to train the model."""
+    """
+    Actor to train the model.
+
+    The `selfplay_training_ratio` controls how often the model is supposed
+    to be updated in comparison to played games. A ration of 2.0 means to
+    update every second played game, a ratio of 0.5 means update twice for
+    each played game.
+
+    If `pit_against_old_model` is True, the trainer will test a new revision
+    of the neural network against the old one and only accept it if it wins
+    >= updateThreshold fraction of games.
+    """
 
     def __init__(
         self,
@@ -310,8 +325,17 @@ class ModelTrainer:
 
 class Coach:
     """
-    This class executes the self-play + learning. It uses the functions defined
-    in Game and NeuralNet. args are specified in main.py.
+    This class executes the alpha zero like learning scheme.
+
+    Upon start it spawns
+    - a shared storage, which holds current model weights and infos,
+    - a replay buffer, which holds recent games played,
+    - a pool of actors for selfplay, which produce new games with the current
+      model weights,
+    - and the model trainer, which updates the model with the recent games.
+
+    It uses the functions defined in Game and NeuralNet.
+    Args are specified in main.py.
     """
 
     def __init__(self, game, nnet, args, pit_against_old_model=False):
@@ -323,13 +347,7 @@ class Coach:
         self.request_gpu = self.nnet.request_gpu()
 
     def learn(self):
-        """
-        Performs numIters iterations with numEps episodes of self-play in each
-        iteration. After every iteration, it retrains neural network with
-        examples in train_examples (which has a maximum length of maxlenofQueue).
-        It then pits the new neural network against the old one and accepts it
-        only if it wins >= updateThreshold fraction of games.
-        """
+        """Start the learning algorithm."""
         games_to_play = self.args.numEps * self.args.numIters
         games_to_use = (
             self.args.numEps * self.args.numItersForTrainExamplesHistory
