@@ -12,7 +12,7 @@ packages = [
 python = "^3.7"
 numpy = "^1.18.3"
 tqdm = "^4.46.0"
-ray = "^0.8.5"
+ray = "^0.8.6"
 cachetools = "^4.1.0"
 elote = "^0.1.0"
 
