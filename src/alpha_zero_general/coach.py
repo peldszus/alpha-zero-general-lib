@@ -267,35 +267,38 @@ class ModelTrainer:
                 time.sleep(0.5)
                 continue
 
-            # train a new model revision
-            old_weights = self.nnet.get_weights()
-            game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
-            games = ray.get(game_object_ids)
-            train_examples = [example for game in games for example in game]
-            shuffle(train_examples)
-            policy_loss, value_loss = self.nnet.train(train_examples)
-            weights = self.nnet.get_weights()
-
-            if self.pit_against_old_model and not self.wins_against_old_model(
-                old_weights
-            ):
-                # reject the model
-                self.nnet.set_weights(old_weights)
-                continue
-            else:
-                self.model_revision = ray.get(
-                    self.shared_storage.set_weights.remote(
-                        weights, policy_loss, value_loss
-                    )
-                )
-                if self.model_revision >= self.save_model_from_revision_n_on:
-                    self.nnet.save_checkpoint(
-                        folder=self.args.checkpoint,
-                        filename=f"model_{self.model_revision:05d}",
-                    )
+            self.train()
 
         # close
         ray.get(self.shared_storage.set_info.remote("trained_enough", True))
+
+    def train(self):
+        """Trains the model one more iteration."""
+        old_weights = self.nnet.get_weights()
+        game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
+        games = ray.get(game_object_ids)
+        train_examples = [example for game in games for example in game]
+        shuffle(train_examples)
+        policy_loss, value_loss = self.nnet.train(train_examples)
+        weights = self.nnet.get_weights()
+
+        if self.pit_against_old_model and not self.wins_against_old_model(
+            old_weights
+        ):
+            # reject the model
+            self.nnet.set_weights(old_weights)
+            return
+        else:
+            self.model_revision = ray.get(
+                self.shared_storage.set_weights.remote(
+                    weights, policy_loss, value_loss
+                )
+            )
+            if self.model_revision >= self.save_model_from_revision_n_on:
+                self.nnet.save_checkpoint(
+                    folder=self.args.checkpoint,
+                    filename=f"model_{self.model_revision:05d}",
+                )
 
     def wins_against_old_model(self, old_weights):
         """Returns True if the current model won pitting against the last one."""
