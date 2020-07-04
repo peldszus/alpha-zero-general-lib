@@ -5,6 +5,7 @@ import ray
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
 from alpha_zero_general.coach import ReplayBuffer
+from alpha_zero_general.coach import SelfPlay
 from alpha_zero_general.coach import SharedStorage
 
 from example.othello.game import OthelloGame
@@ -32,7 +33,7 @@ args = DotDict(
 def test_shared_storage():
     init_weights = [0, 0]
     init_revision = 1
-    ray.init()
+    ray.init(local_mode=True)
     s = SharedStorage.remote(init_weights, revision=init_revision)
     assert ray.get(s.get_revision.remote()) == init_revision
     assert ray.get(s.get_weights.remote()) == (init_weights, init_revision)
@@ -59,7 +60,7 @@ def test_replay_buffer():
         return [game] * size
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init()
+        ray.init(local_mode=True)
 
         r = ReplayBuffer.remote(games_to_use=5, folder=tmpdirname)
         assert ray.get(r.get_number_of_games_played.remote()) == 0
@@ -96,6 +97,32 @@ def test_replay_buffer():
         assert ray.get(r.load.remote()) == 6
         assert ray.get(r.played_enough.remote()) is False
 
+        ray.shutdown()
+
+
+def test_self_play():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        ray.init(local_mode=True)
+        game = OthelloGame(6)
+        nnet = OthelloNNet(game)
+        s = SharedStorage.remote(nnet.get_weights())
+        r = ReplayBuffer.remote(
+            games_to_play=1, games_to_use=1, folder=tmpdirname
+        )
+        assert ray.get(r.get_number_of_games_played.remote()) == 0
+        self_play = SelfPlay.remote(r, s, game, nnet.__class__, dict(args))
+        ray.get(self_play.start.remote())
+        assert ray.get(r.get_number_of_games_played.remote()) == 1
+        assert ray.get(r.played_enough.remote()) is True
+        games = ray.get(ray.get(r.get_examples.remote()))
+        assert len(games) == 1
+        examples = games[0]
+        assert len(examples) > 2
+        board, policy, winner = examples[0]
+        assert isinstance(board, type(game.get_init_board()))
+        assert len(policy) == game.get_action_size()
+        assert all(0 <= value <= 1 for value in policy)
+        assert winner in [1, -1]
         ray.shutdown()
 
 
