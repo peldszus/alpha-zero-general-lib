@@ -1,9 +1,11 @@
 import os
+import random
 import tempfile
 
 import ray
 from alpha_zero_general import Coach
 from alpha_zero_general import DotDict
+from alpha_zero_general.coach import ModelTrainer
 from alpha_zero_general.coach import ReplayBuffer
 from alpha_zero_general.coach import SelfPlay
 from alpha_zero_general.coach import SharedStorage
@@ -14,7 +16,7 @@ from example.othello.keras import OthelloNNet
 args = DotDict(
     {
         "numIters": 2,
-        "numEps": 10,  # Number of complete self-play games to simulate during a new iteration.
+        "numEps": 2,  # Number of complete self-play games to simulate during a new iteration.
         "tempThreshold": 15,  #
         "updateThreshold": 0.6,  # During arena playoff, new neural net will be accepted if threshold or more of games are won.
         "maxlenOfQueue": 10,  # Number of game examples to train the neural networks.
@@ -126,14 +128,104 @@ def test_self_play():
         ray.shutdown()
 
 
-def test_coach_with_pit(capsys):
+def mock_example_data(game):
+    board = game.get_init_board()
+    pi = [random.random() for _ in range(game.get_action_size())]
+    player = random.choice([1, -1])
+    return [(b, p, player) for b, p in game.get_symmetries(board, pi)]
+
+
+@ray.remote
+class MockedReplayBuffer(ReplayBuffer.__ray_actor_class__):  # type: ignore
+    """A replay buffer that behaves so that we'll go through all branches
+    of ModelTrainer.start()."""
+
+    played_enough_return_values = [False, False, False, True]
+
+    def played_enough(self):
+        """Returns preset values useful in this test."""
+        return self.played_enough_return_values.pop(0)
+
+    games_played_return_values = [0, 2, 4, 8]
+
+    def get_number_of_games_played(self):
+        """Returns preset values useful in this test."""
+        return self.games_played_return_values.pop(0)
+
+
+def test_model_trainer_loop():
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        ray.init(local_mode=True)
+        game = OthelloGame(6)
+        nnet = OthelloNNet(game)
+        s = SharedStorage.remote(nnet.get_weights())
+        assert ray.get(s.get_revision.remote()) == 0
+        r = MockedReplayBuffer.remote(
+            games_to_play=4, games_to_use=4, folder=tmpdirname
+        )
+        r.add_game_examples.remote(mock_example_data(game))
+
+        model_trainer = ModelTrainer.options(num_gpus=0).remote(
+            r, s, game, nnet.__class__, dict(args), selfplay_training_ratio=1
+        )
+        ray.get(model_trainer.start.remote())
+        assert ray.get(s.get_revision.remote()) > 0
+        assert ray.get(s.trained_enough.remote()) is True
+        ray.shutdown()
+
+
+def test_model_trainer_pit_accept_model(capsys):
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        ray.init(local_mode=True)
+        game = OthelloGame(6)
+        nnet = OthelloNNet(game)
+        s = SharedStorage.remote(nnet.get_weights())
+        assert ray.get(s.get_revision.remote()) == 0
+        r = ReplayBuffer.remote(
+            games_to_play=2, games_to_use=2, folder=tmpdirname
+        )
+        r.add_game_examples.remote(mock_example_data(game))
+        # provoke model acceptance by tweaking updateThreshold to pass
+        custom_args = dict(args, updateThreshold=-0.1)
+        model_trainer = ModelTrainer.options(num_gpus=0).remote(
+            r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
+        )
+        ray.get(model_trainer.train.remote())
+        assert ray.get(s.get_revision.remote()) == 1
+        out, _err = capsys.readouterr()
+        assert "PITTING AGAINST PREVIOUS VERSION" in out
+        assert "ACCEPTING NEW MODEL" in out
+        ray.shutdown()
+
+
+def test_model_trainer_pit_reject_model(capsys):
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        ray.init(local_mode=True)
+        game = OthelloGame(6)
+        nnet = OthelloNNet(game)
+        s = SharedStorage.remote(nnet.get_weights())
+        assert ray.get(s.get_revision.remote()) == 0
+        r = ReplayBuffer.remote(
+            games_to_play=2, games_to_use=2, folder=tmpdirname
+        )
+        r.add_game_examples.remote(mock_example_data(game))
+        # provoke model rejection by tweaking updateThreshold to fail
+        custom_args = dict(args, updateThreshold=1.1)
+        model_trainer = ModelTrainer.options(num_gpus=0).remote(
+            r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
+        )
+        ray.get(model_trainer.train.remote())
+        assert ray.get(s.get_revision.remote()) == 0
+        out, _err = capsys.readouterr()
+        assert "PITTING AGAINST PREVIOUS VERSION" in out
+        assert "REJECTING NEW MODEL" in out
+        ray.shutdown()
+
+
+def test_coach(capsys):
     with tempfile.TemporaryDirectory() as tmpdirname:
         args.checkpoint = tmpdirname
         game = OthelloGame(6)
         nnet = OthelloNNet(game)
-        coach = Coach(game, nnet, args, pit_against_old_model=True)
+        coach = Coach(game, nnet, args)
         coach.learn()
-        out, _err = capsys.readouterr()
-        print(out)
-        assert "PITTING AGAINST PREVIOUS VERSION" in out
-        assert "ACCEPTING NEW MODEL" in out or "REJECTING NEW MODEL" in out

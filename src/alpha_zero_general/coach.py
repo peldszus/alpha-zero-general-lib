@@ -150,7 +150,7 @@ class SharedStorage:
 class ReplayBuffer:
     """Actor to store played games and provide the latest examples for training."""
 
-    def __init__(self, games_to_play=1000, games_to_use=1000, folder=None):
+    def __init__(self, games_to_play=1000, games_to_use=500, folder=None):
         self.history = deque([], maxlen=games_to_use)
         self.games_to_play = games_to_play
         self.games_to_use = games_to_use
@@ -240,9 +240,6 @@ class ModelTrainer:
         self.model_revision = -1
         self.selfplay_training_ratio = selfplay_training_ratio
         self.save_model_from_revision_n_on = save_model_from_revision_n_on
-
-    def start(self):
-        """Start the main training loop and close when done."""
         # get initial weights
         self.nnet = self.nnet_class(self.game)
         weights, self.model_revision = ray.get(
@@ -250,6 +247,8 @@ class ModelTrainer:
         )
         self.nnet.set_weights(weights)
 
+    def start(self):
+        """Start the main training loop and close when done."""
         # train loop, we train as long as we play
         while not ray.get(self.replay_buffer.played_enough.remote()):
 
