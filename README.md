@@ -40,6 +40,8 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 * [x] Fix all flake8 issues
 * [x] Proper abstract classes for Game and NeuralNet
 * [ ] Make MCTS and model parameters explicit
+* [ ] .. or replace DotDict with overall config class
+* [ ] Use logging
 
 **General player classes:**
 * [x] AlphaZeroPlayer out of pit code
@@ -48,13 +50,16 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 **Asynchronous & parallel processing:**
 * [x] Ray step 1: Use Ray to parallelize self-play
-* [ ] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
-* [ ] Ray step 3: Make self-play and training fully async
+* [x] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
+* [x] Ray step 3: Make self-play and training fully async
 * [ ] Ray step 4: Parallelize the arena play during league execution
+* [x] Add parameter to control selfplay vs training
 
 **Improvements:**
-* [ ] Store all models, if accepted or not
-* [ ] Store training examples per iteration to reduce memory intense data duplication
+* [x] Store all models, if accepted or not
+* [x] Store training examples per game to reduce data duplication
+* [x] Be able to continue training
+* [ ] Add dirichlet noise for better exploration
 
 **New features:**
 * [x] League evaluations with ELO scores
@@ -62,5 +67,5 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 
 ## Contributors and Credits
-* The original version was written by [Surag Nair](https://github.com/suragnair).
-* [Shantanu Thakoor](https://github.com/ShantanuThakoor) and [Megha Jhunjhunwala](https://github.com/jjw-megha) helped with core design and implementation.
+* The original version was written by [Surag Nair](https://github.com/suragnair) and credits go to all contributors of https://github.com/suragnair/alpha-zero-general.
+* The use of ray is inspired by https://github.com/werner-duvaud/muzero-general.

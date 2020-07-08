@@ -1,5 +1,10 @@
+"""
+An asynchronous implementation of the general alpha-zero algorithm.
+"""
+
+import glob
 import os
-import sys
+import time
 from collections import deque
 from copy import deepcopy
 from pickle import Pickler
@@ -13,19 +18,35 @@ from tqdm import tqdm
 from .arena import Arena
 from .mcts import MCTS
 from .utils import DotDict
+from .utils import parse_game_filename
+from .utils import parse_model_filename
 
 
 @ray.remote
-class SelfPlayActor:
-    def __init__(self, game, nnet_class, args, folder="", filename=""):
+class SelfPlay:
+    """Actor to execute self play."""
+
+    def __init__(self, replay_buffer, shared_storage, game, nnet_class, args):
+        self.replay_buffer = replay_buffer
+        self.shared_storage = shared_storage
         self.game = game
         self.args = DotDict(args)
         self.nnet = nnet_class(self.game)
-        self.nnet.load_checkpoint(folder=folder, filename=filename)
-        # TODO: be able to pass picklable weights instead of checkpoints
         self.mcts = None
+        self.model_revision = -1
 
-    def execute_episode(self, episode_number=None):
+    def start(self):
+        """Start the main self play loop for this actor and close when done."""
+        while not ray.get(self.replay_buffer.played_enough.remote()):
+            weights, self.model_revision = ray.get(
+                self.shared_storage.get_weights.remote(self.model_revision)
+            )
+            if weights:
+                self.nnet.set_weights(weights)
+            examples = self.execute_episode()
+            self.replay_buffer.add_game_examples.remote(examples)
+
+    def execute_episode(self):
         """
         This function executes one episode of self-play, starting with player 1.
         As the game is played, each turn is added as a training example to
@@ -74,162 +95,347 @@ class SelfPlayActor:
                 ]
 
 
-class Coach:
-    """
-    This class executes the self-play + learning. It uses the functions defined
-    in Game and NeuralNet. args are specified in main.py.
-    """
+@ray.remote
+class SharedStorage:
+    """Actor to store and provide the most recent network weights and infos."""
 
-    def __init__(self, game, nnet, args):
-        self.game = game
-        self.nnet = nnet
-        self.pnet = self.nnet.__class__(self.game)  # the competitor network
-        self.args = args
-        # history of examples from args.numItersForTrainExamplesHistory latest iterations
-        self.train_examples_history = []
-        # can be overriden in load_train_examples()
-        self.skip_first_self_play = False
+    def __init__(self, weights, revision=0):
+        self.weights = weights
+        self.revision = revision
+        self.infos = {
+            "trained_enough": False,
+            "policy_loss": None,
+            "value_loss": None,
+        }
+        print(f"Initialized with weights at revision {self.revision}.")
 
-    def learn(self):
+    def get_weights(self, revision=0):
         """
-        Performs numIters iterations with numEps episodes of self-play in each
-        iteration. After every iteration, it retrains neural network with
-        examples in train_examples (which has a maximum length of maxlenofQueue).
-        It then pits the new neural network against the old one and accepts it
-        only if it wins >= updateThreshold fraction of games.
+        Return the weights and the current revision, if the given revision
+        is older than the current one. Otherwise return None-type weights.
         """
-        ray.init(ignore_reinit_error=True)
+        if revision < self.revision:
+            return self.weights, self.revision
+        else:
+            return None, self.revision
 
-        for i in range(1, self.args.numIters + 1):
-            # bookkeeping
-            print("------ITER " + str(i) + "------")
+    def get_revision(self):
+        """Return the current revision of the model weights."""
+        return self.revision
 
-            # store model to be loaded to actors
-            self.nnet.save_checkpoint(
-                folder=self.args.checkpoint, filename="temp.pth.tar"
+    def set_weights(self, weights, policy_loss=None, value_loss=None):
+        """Set the next revision of the model weights."""
+        self.weights = weights
+        if policy_loss:
+            self.set_info("policy_loss", policy_loss)
+        if value_loss:
+            self.set_info("value_loss", value_loss)
+        self.revision += 1
+        return self.revision
+
+    def get_infos(self):
+        """Returns the stored information dictionary."""
+        return self.infos
+
+    def set_info(self, key, value):
+        """Set or update a value in the information dictionary."""
+        self.infos[key] = value
+
+    def trained_enough(self):
+        """Returns true if the last iteration of training is done."""
+        return self.infos["trained_enough"]
+
+
+@ray.remote
+class ReplayBuffer:
+    """Actor to store played games and provide the latest examples for training."""
+
+    def __init__(self, games_to_play=1000, games_to_use=500, folder=None):
+        self.history = deque([], maxlen=games_to_use)
+        self.games_to_play = games_to_play
+        self.games_to_use = games_to_use
+        self.games_played = 0
+        self.folder = folder
+
+    def get_examples(self):
+        """Returns a list of (ray object ids of) examples from the history of played games."""
+        return list(self.history)
+
+    def add_game_examples(self, examples):
+        """Add examples of a recent game."""
+        self.history.append(ray.put(examples))
+        self.games_played += 1
+        self.save(examples, self.games_played)
+
+    def get_number_of_games_played(self):
+        """Return the number of games played."""
+        return self.games_played
+
+    def played_enough(self):
+        """Returns true if all the number of requested games has been played."""
+        return self.games_played >= self.games_to_play
+
+    def load(self):
+        """Loads game examples from folder and return the total number of
+        games played."""
+        print(f"Loading played games from {self.folder}...")
+        filenames = sorted(glob.glob(os.path.join(self.folder, "game_*")))
+        self.games_played = 0
+        if filenames:
+            self.games_played = parse_game_filename(
+                os.path.basename(filenames[-1])
             )
+        for filename in filenames[-self.games_to_use :]:
+            print(f"Loading from {filename}...")
+            with open(filename, "rb") as f:
+                examples = Unpickler(f).load()
+                self.history.append(ray.put(examples))
+        print("Done loading.")
+        return self.games_played
 
-            # setup self play actor pool
-            actor_pool = ray.util.ActorPool(
-                [
-                    SelfPlayActor.remote(
-                        deepcopy(self.game),
-                        self.nnet.__class__,
-                        dict(self.args),
-                        folder=self.args.checkpoint,
-                        filename="temp.pth.tar",
-                    )
-                    for _ in range(self.args.nr_actors)
-                ]
-            )
-
-            # generate examples of the iteration
-            if not self.skip_first_self_play or i > 1:
-                iteration_train_examples = deque(
-                    [], maxlen=self.args.maxlenOfQueue
-                )
-
-                with tqdm(
-                    desc="Self play episodes", total=self.args.numEps
-                ) as bar:
-                    for train_examples in actor_pool.map_unordered(
-                        lambda a, v: a.execute_episode.remote(v),
-                        range(1, self.args.numEps + 1),
-                    ):
-                        iteration_train_examples += train_examples
-                        bar.update(1)
-
-                # save the iteration examples to the history
-                self.train_examples_history.append(iteration_train_examples)
-
-            if (
-                len(self.train_examples_history)
-                > self.args.numItersForTrainExamplesHistory
-            ):
-                print(
-                    "len(train_examples_history) =",
-                    len(self.train_examples_history),
-                    " => remove the oldest train_examples",
-                )
-                self.train_examples_history.pop(0)
-            # backup history to a file
-            # NB! the examples were collected using the model from the previous iteration, so (i-1)
-            self.save_train_examples(i - 1)
-
-            # shuffle examples before training
-            train_examples = []
-            for e in self.train_examples_history:
-                train_examples.extend(e)
-            shuffle(train_examples)
-
-            # training new network, keeping a copy of the old one
-            self.nnet.save_checkpoint(
-                folder=self.args.checkpoint, filename="temp.pth.tar"
-            )
-            self.pnet.load_checkpoint(
-                folder=self.args.checkpoint, filename="temp.pth.tar"
-            )
-            pmcts = MCTS(self.game, self.pnet, self.args)
-
-            self.nnet.train(train_examples)
-            nmcts = MCTS(self.game, self.nnet, self.args)
-
-            print("PITTING AGAINST PREVIOUS VERSION")
-            arena = Arena(
-                lambda x: np.argmax(pmcts.get_action_prob(x, temp=0)),
-                lambda x: np.argmax(nmcts.get_action_prob(x, temp=0)),
-                self.game,
-            )
-            pwins, nwins, draws = arena.play_games(self.args.arenaCompare)
-
-            print(
-                "NEW/PREV WINS : %d / %d ; DRAWS : %d" % (nwins, pwins, draws)
-            )
-            if (
-                pwins + nwins == 0
-                or float(nwins) / (pwins + nwins) < self.args.updateThreshold
-            ):
-                print("REJECTING NEW MODEL")
-                self.nnet.load_checkpoint(
-                    folder=self.args.checkpoint, filename="temp.pth.tar"
-                )
-            else:
-                print("ACCEPTING NEW MODEL")
-                self.nnet.save_checkpoint(
-                    folder=self.args.checkpoint,
-                    filename=self.get_checkpoint_file(i),
-                )
-                self.nnet.save_checkpoint(
-                    folder=self.args.checkpoint, filename="best.pth.tar"
-                )
-        ray.shutdown()
-
-    def get_checkpoint_file(self, iteration):
-        return "checkpoint_" + str(iteration) + ".pth.tar"
-
-    def save_train_examples(self, iteration):
-        folder = self.args.checkpoint
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+    def save(self, examples, number_of_games_played):
+        """Saves game examples to folder."""
+        if not os.path.exists(self.folder):
+            os.makedirs(self.folder)
         filename = os.path.join(
-            folder, self.get_checkpoint_file(iteration) + ".examples"
+            self.folder, f"game_{number_of_games_played:08d}"
         )
         with open(filename, "wb+") as f:
-            Pickler(f).dump(self.train_examples_history)
+            Pickler(f).dump(examples)
 
-    def load_train_examples(self):
-        model_file = os.path.join(
-            self.args.load_folder_file[0], self.args.load_folder_file[1]
+
+@ray.remote
+class ModelTrainer:
+    """
+    Actor to train the model.
+
+    The `selfplay_training_ratio` controls how often the model is supposed
+    to be updated in comparison to played games. A ration of 2.0 means to
+    update every second played game, a ratio of 0.5 means update twice for
+    each played game.
+
+    If `pit_against_old_model` is True, the trainer will test a new revision
+    of the neural network against the old one and only accept it if it wins
+    >= updateThreshold fraction of games.
+    """
+
+    def __init__(
+        self,
+        replay_buffer,
+        shared_storage,
+        game,
+        nnet_class,
+        args,
+        selfplay_training_ratio=2.0,
+        pit_against_old_model=False,
+        save_model_from_revision_n_on=0,
+    ):
+        self.replay_buffer = replay_buffer
+        self.shared_storage = shared_storage
+        self.game = game
+        self.args = DotDict(args)
+        self.pit_against_old_model = pit_against_old_model
+        self.nnet_class = nnet_class
+        self.nnet = None
+        self.model_revision = -1
+        self.selfplay_training_ratio = selfplay_training_ratio
+        self.save_model_from_revision_n_on = save_model_from_revision_n_on
+        # get initial weights
+        self.nnet = self.nnet_class(self.game)
+        weights, self.model_revision = ray.get(
+            self.shared_storage.get_weights.remote(self.model_revision)
         )
-        examples_file = model_file + ".examples"
-        if not os.path.isfile(examples_file):
-            print(examples_file)
-            r = input("File with training examples not found. Continue? [y|n]")
-            if r != "y":
-                sys.exit()
+        self.nnet.set_weights(weights)
+
+    def start(self):
+        """Start the main training loop and close when done."""
+        # train loop, we train as long as we play
+        while not ray.get(self.replay_buffer.played_enough.remote()):
+
+            # wait with training according to selfplay / training ratio
+            games_played, model_revision = ray.get(
+                [
+                    self.replay_buffer.get_number_of_games_played.remote(),
+                    self.shared_storage.get_revision.remote(),
+                ]
+            )
+            if (
+                games_played / max(1, model_revision)
+                <= self.selfplay_training_ratio
+            ):
+                time.sleep(0.5)
+                continue
+
+            self.train()
+
+        # close
+        ray.get(self.shared_storage.set_info.remote("trained_enough", True))
+
+    def train(self):
+        """Trains the model one more iteration."""
+        old_weights = self.nnet.get_weights()
+        game_object_ids = ray.get(self.replay_buffer.get_examples.remote())
+        games = ray.get(game_object_ids)
+        train_examples = [example for game in games for example in game]
+        shuffle(train_examples)
+        policy_loss, value_loss = self.nnet.train(train_examples)
+        weights = self.nnet.get_weights()
+
+        if self.pit_against_old_model and not self.wins_against_old_model(
+            old_weights
+        ):
+            # reject the model
+            self.nnet.set_weights(old_weights)
+            return
         else:
-            print("File with training examples found. Read it.")
-            with open(examples_file, "rb") as f:
-                self.train_examples_history = Unpickler(f).load()
-            # examples based on the model were already collected (loaded)
-            self.skip_first_self_play = True
+            self.model_revision = ray.get(
+                self.shared_storage.set_weights.remote(
+                    weights, policy_loss, value_loss
+                )
+            )
+            if self.model_revision >= self.save_model_from_revision_n_on:
+                self.nnet.save_checkpoint(
+                    folder=self.args.checkpoint,
+                    filename=f"model_{self.model_revision:05d}",
+                )
+
+    def wins_against_old_model(self, old_weights):
+        """Returns True if the current model won pitting against the last one."""
+        # TODO: Like training, this should be done on GPU if possible.
+        print("PITTING AGAINST PREVIOUS VERSION")
+        old_net = self.nnet_class(self.game)
+        old_net.set_weights(old_weights)
+        pmcts = MCTS(self.game, old_net, self.args)
+        nmcts = MCTS(self.game, self.nnet, self.args)
+        arena = Arena(
+            lambda x: np.argmax(pmcts.get_action_prob(x, temp=0)),
+            lambda x: np.argmax(nmcts.get_action_prob(x, temp=0)),
+            self.game,
+        )
+        pwins, nwins, draws = arena.play_games(self.args.arenaCompare)
+        print("NEW/PREV WINS : %d / %d ; DRAWS : %d" % (nwins, pwins, draws))
+        if (
+            pwins + nwins == 0
+            or float(nwins) / (pwins + nwins) < self.args.updateThreshold
+        ):
+            print("REJECTING NEW MODEL")
+            return False
+        else:
+            print("ACCEPTING NEW MODEL")
+            return True
+
+
+class Coach:
+    """
+    This class executes the alpha zero like learning scheme.
+
+    Upon start it spawns
+    - a shared storage, which holds current model weights and infos,
+    - a replay buffer, which holds recent games played,
+    - a pool of actors for selfplay, which produce new games with the current
+      model weights,
+    - and the model trainer, which updates the model with the recent games.
+
+    It uses the functions defined in Game and NeuralNet.
+    Args are specified in main.py.
+    """
+
+    def __init__(self, game, nnet, args, pit_against_old_model=False):
+        self.game = game
+        self.nnet = nnet
+        self.nnet_class = nnet.__class__
+        self.args = args
+        self.pit_against_old_model = pit_against_old_model
+        self.request_gpu = self.nnet.request_gpu()
+
+    def learn(self):
+        """Start the learning algorithm."""
+        games_to_play = self.args.numEps * self.args.numIters
+        games_to_use = (
+            self.args.numEps * self.args.numItersForTrainExamplesHistory
+        )
+
+        revision = 0
+        if self.args.load_model:
+            print(
+                f"Loading initial model from checkpoint {self.args.load_folder_file}..."
+            )
+            revision = parse_model_filename(self.args.load_folder_file[1])
+            self.nnet.load_checkpoint(
+                folder=self.args.load_folder_file[0],
+                filename=self.args.load_folder_file[1],
+            )
+
+        # initialize components
+        ray.init(ignore_reinit_error=True)
+
+        shared_storage = SharedStorage.remote(
+            self.nnet.get_weights(), revision=revision
+        )
+        del self.nnet
+
+        replay_buffer = ReplayBuffer.remote(
+            games_to_play=games_to_play,
+            games_to_use=games_to_use,
+            folder=self.args.checkpoint,
+        )
+        ray.get(replay_buffer.load.remote())
+
+        self_play_actor_pool = [
+            SelfPlay.remote(
+                replay_buffer,
+                shared_storage,
+                deepcopy(self.game),
+                self.nnet_class,
+                dict(self.args),
+            )
+            for _ in range(self.args.nr_actors)
+        ]
+        model_trainer = ModelTrainer.options(
+            num_gpus=1 if self.request_gpu else 0
+        ).remote(
+            replay_buffer,
+            shared_storage,
+            deepcopy(self.game),
+            self.nnet_class,
+            dict(self.args),
+            pit_against_old_model=self.pit_against_old_model,
+        )
+
+        # start self play and model trainer
+        for actor in self_play_actor_pool:
+            actor.start.remote()
+        model_trainer.start.remote()
+
+        # wait until all games are played
+        t = tqdm(
+            desc="Self played games",
+            total=games_to_play,
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}{postfix}]",
+        )
+        while not all(
+            ray.get(
+                [
+                    replay_buffer.played_enough.remote(),
+                    shared_storage.trained_enough.remote(),
+                ]
+            )
+        ):
+            games_played, revision, infos = ray.get(
+                [
+                    replay_buffer.get_number_of_games_played.remote(),
+                    shared_storage.get_revision.remote(),
+                    shared_storage.get_infos.remote(),
+                ]
+            )
+            t.set_postfix(
+                model=revision,
+                pi_loss=infos["policy_loss"],
+                v_loss=infos["value_loss"],
+            )
+            t.update(games_played - t.n)
+            time.sleep(0.5)
+        t.close()
+
+        # close
+        ray.shutdown()

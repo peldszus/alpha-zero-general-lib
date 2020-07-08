@@ -25,14 +25,5 @@ args = DotDict(
 if __name__ == "__main__":
     game = OthelloGame(6)
     nnet = OthelloNNet(game)
-
-    if args.load_model:
-        nnet.load_checkpoint(
-            args.load_folder_file[0], args.load_folder_file[1]
-        )
-
     coach = Coach(game, nnet, args)
-    if args.load_model:
-        print("Load trainExamples from file")
-        coach.load_train_examples()
     coach.learn()

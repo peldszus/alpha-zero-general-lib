@@ -2,7 +2,7 @@
 name = "alpha-zero-general-lib"
 version = "0.1.0"
 description = "A simplified, highly flexible, commented and (hopefully) easy to understand implementation of self-play based reinforcement learning based on the AlphaGo Zero paper turned into a library"
-authors = ["Surag Nair", "Shantanu Thakoor", "Megha Jhunjhunwala", "Andreas Peldszus"]
+authors = ["Surag Nair", "Andreas Peldszus"]
 license = "MIT"
 packages = [
     { include = "alpha_zero_general", from = "src" },
@@ -12,7 +12,7 @@ packages = [
 python = "^3.7"
 numpy = "^1.18.3"
 tqdm = "^4.46.0"
-ray = "^0.8.5"
+ray = "^0.8.6"
 cachetools = "^4.1.0"
 elote = "^0.1.0"
 
@@ -25,13 +25,17 @@ pylint = "^2.5.0"
 pytest = "^5.4.1"
 pytest-cov = "^2.8.1"
 
+[tool.poetry.scripts]
+alpha_zero_train = 'alpha_zero_general.scripts:train'
+alpha_zero_pit = 'alpha_zero_general.scripts:pit'
+
 [tool.black]
 line-length = 79
 target_version = ["py37"]
 exclude = "\\.git|env"
 
 [tool.isort]
-known_third_party = ["alpha_zero_general", "cachetools", "elote", "numpy", "ray", "tqdm"]
+known_third_party = ["alpha_zero_general", "cachetools", "elote", "numpy", "pytest", "ray", "tqdm"]
 line_length = 79
 force_single_line = true
 multi_line_output = 3

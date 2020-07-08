@@ -29,6 +29,9 @@ class NeuralNet(ABC):
                       (board, pi, v). pi is the MCTS informed policy vector for
                       the given board, and v is its value. The examples has
                       board in its canonical form.
+
+        Returns:
+            pi_loss, v_loss: The losses after training the model using the examples.
         """
 
     @abstractmethod
@@ -54,4 +57,22 @@ class NeuralNet(ABC):
     def load_checkpoint(self, folder, filename):
         """
         Loads parameters of the neural network from folder/filename
+        """
+
+    @abstractmethod
+    def get_weights(self):
+        """
+        Returns the weights of the neural network.
+        """
+
+    @abstractmethod
+    def set_weights(self, weights):
+        """
+        Sets the given weights to the neural network.
+        """
+
+    @abstractmethod
+    def request_gpu(self):
+        """
+        Returns True if a gpu should be used, otherwise False.
         """
