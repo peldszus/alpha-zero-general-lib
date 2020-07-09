@@ -1,6 +1,5 @@
 import os
 import random
-import tempfile
 
 import ray
 from alpha_zero_general import Coach
@@ -35,7 +34,7 @@ args = DotDict(
 def test_shared_storage():
     init_weights = [0, 0]
     init_revision = 1
-    ray.init(local_mode=True)
+    ray.init(local_mode=True, ignore_reinit_error=True)
     s = SharedStorage.remote(init_weights, revision=init_revision)
     assert ray.get(s.get_revision.remote()) == init_revision
     assert ray.get(s.get_weights.remote()) == (init_weights, init_revision)
@@ -57,75 +56,67 @@ def test_shared_storage():
     ray.shutdown()
 
 
-def test_replay_buffer():
+def test_replay_buffer(tmpdir):
     def mock_game_examples(game=1, size=10):
         return [game] * size
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init(local_mode=True)
+    ray.init(local_mode=True, ignore_reinit_error=True)
 
-        r = ReplayBuffer.remote(games_to_use=5, folder=tmpdirname)
-        assert ray.get(r.get_number_of_games_played.remote()) == 0
-        game_1 = mock_game_examples(game=1)
-        r.add_game_examples.remote(game_1)
-        assert ray.get(r.get_number_of_games_played.remote()) == 1
-        assert os.path.isfile(os.path.join(tmpdirname, f"game_{1:08d}"))
-        assert ray.get(ray.get(r.get_examples.remote())) == [game_1]
-        for game in range(2, 7):
-            r.add_game_examples.remote(mock_game_examples(game=game))
-        assert ray.get(r.get_number_of_games_played.remote()) == 6
-        games = ray.get(ray.get(r.get_examples.remote()))
-        assert len(games) == 5
-        assert games[0][0] == 2
-        assert games[-1][0] == 6
-        assert os.path.isfile(os.path.join(tmpdirname, f"game_{6:08d}"))
+    r = ReplayBuffer.remote(games_to_use=5, folder=tmpdir)
+    assert ray.get(r.get_number_of_games_played.remote()) == 0
+    game_1 = mock_game_examples(game=1)
+    r.add_game_examples.remote(game_1)
+    assert ray.get(r.get_number_of_games_played.remote()) == 1
+    assert os.path.isfile(os.path.join(tmpdir, f"game_{1:08d}"))
+    assert ray.get(ray.get(r.get_examples.remote())) == [game_1]
+    for game in range(2, 7):
+        r.add_game_examples.remote(mock_game_examples(game=game))
+    assert ray.get(r.get_number_of_games_played.remote()) == 6
+    games = ray.get(ray.get(r.get_examples.remote()))
+    assert len(games) == 5
+    assert games[0][0] == 2
+    assert games[-1][0] == 6
+    assert os.path.isfile(os.path.join(tmpdir, f"game_{6:08d}"))
 
-        r = ReplayBuffer.remote(games_to_use=5, folder=tmpdirname)
-        assert ray.get(r.load.remote()) == 6
-        games = ray.get(ray.get(r.get_examples.remote()))
-        assert len(games) == 5
-        assert games[0][0] == 2
-        assert games[-1][0] == 6
+    r = ReplayBuffer.remote(games_to_use=5, folder=tmpdir)
+    assert ray.get(r.load.remote()) == 6
+    games = ray.get(ray.get(r.get_examples.remote()))
+    assert len(games) == 5
+    assert games[0][0] == 2
+    assert games[-1][0] == 6
 
-        r = ReplayBuffer.remote(
-            games_to_play=5, games_to_use=5, folder=tmpdirname
-        )
-        assert ray.get(r.load.remote()) == 6
-        assert ray.get(r.played_enough.remote()) is True
+    r = ReplayBuffer.remote(games_to_play=5, games_to_use=5, folder=tmpdir)
+    assert ray.get(r.load.remote()) == 6
+    assert ray.get(r.played_enough.remote()) is True
 
-        r = ReplayBuffer.remote(
-            games_to_play=10, games_to_use=5, folder=tmpdirname
-        )
-        assert ray.get(r.load.remote()) == 6
-        assert ray.get(r.played_enough.remote()) is False
+    r = ReplayBuffer.remote(games_to_play=10, games_to_use=5, folder=tmpdir)
+    assert ray.get(r.load.remote()) == 6
+    assert ray.get(r.played_enough.remote()) is False
 
-        ray.shutdown()
+    ray.shutdown()
 
 
-def test_self_play():
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init(local_mode=True)
-        game = OthelloGame(6)
-        nnet = OthelloNNet(game)
-        s = SharedStorage.remote(nnet.get_weights())
-        r = ReplayBuffer.remote(
-            games_to_play=1, games_to_use=1, folder=tmpdirname
-        )
-        assert ray.get(r.get_number_of_games_played.remote()) == 0
-        self_play = SelfPlay.remote(r, s, game, nnet.__class__, dict(args))
-        ray.get(self_play.start.remote())
-        assert ray.get(r.get_number_of_games_played.remote()) == 1
-        assert ray.get(r.played_enough.remote()) is True
-        games = ray.get(ray.get(r.get_examples.remote()))
-        assert len(games) == 1
-        examples = games[0]
-        assert len(examples) > 2
-        board, policy, winner = examples[0]
-        assert isinstance(board, type(game.get_init_board()))
-        assert len(policy) == game.get_action_size()
-        assert all(0 <= value <= 1 for value in policy)
-        assert winner in [1, -1]
-        ray.shutdown()
+def test_self_play(tmpdir):
+    ray.init(local_mode=True, ignore_reinit_error=True)
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    s = SharedStorage.remote(nnet.get_weights())
+    r = ReplayBuffer.remote(games_to_play=1, games_to_use=1, folder=tmpdir)
+    assert ray.get(r.get_number_of_games_played.remote()) == 0
+    self_play = SelfPlay.remote(r, s, game, nnet.__class__, dict(args))
+    ray.get(self_play.start.remote())
+    assert ray.get(r.get_number_of_games_played.remote()) == 1
+    assert ray.get(r.played_enough.remote()) is True
+    games = ray.get(ray.get(r.get_examples.remote()))
+    assert len(games) == 1
+    examples = games[0]
+    assert len(examples) > 2
+    board, policy, winner = examples[0]
+    assert isinstance(board, type(game.get_init_board()))
+    assert len(policy) == game.get_action_size()
+    assert all(0 <= value <= 1 for value in policy)
+    assert winner in [1, -1]
+    ray.shutdown()
 
 
 def mock_example_data(game):
@@ -153,79 +144,71 @@ class MockedReplayBuffer(ReplayBuffer.__ray_actor_class__):  # type: ignore
         return self.games_played_return_values.pop(0)
 
 
-def test_model_trainer_loop():
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init(local_mode=True)
-        game = OthelloGame(6)
-        nnet = OthelloNNet(game)
-        s = SharedStorage.remote(nnet.get_weights())
-        assert ray.get(s.get_revision.remote()) == 0
-        r = MockedReplayBuffer.remote(
-            games_to_play=4, games_to_use=4, folder=tmpdirname
-        )
-        r.add_game_examples.remote(mock_example_data(game))
+def test_model_trainer_loop(tmpdir):
+    ray.init(local_mode=True, ignore_reinit_error=True)
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    s = SharedStorage.remote(nnet.get_weights())
+    assert ray.get(s.get_revision.remote()) == 0
+    r = MockedReplayBuffer.remote(
+        games_to_play=4, games_to_use=4, folder=tmpdir
+    )
+    r.add_game_examples.remote(mock_example_data(game))
 
-        model_trainer = ModelTrainer.options(num_gpus=0).remote(
-            r, s, game, nnet.__class__, dict(args), selfplay_training_ratio=1
-        )
-        ray.get(model_trainer.start.remote())
-        assert ray.get(s.get_revision.remote()) > 0
-        assert ray.get(s.trained_enough.remote()) is True
-        ray.shutdown()
-
-
-def test_model_trainer_pit_accept_model(capsys):
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init(local_mode=True)
-        game = OthelloGame(6)
-        nnet = OthelloNNet(game)
-        s = SharedStorage.remote(nnet.get_weights())
-        assert ray.get(s.get_revision.remote()) == 0
-        r = ReplayBuffer.remote(
-            games_to_play=2, games_to_use=2, folder=tmpdirname
-        )
-        r.add_game_examples.remote(mock_example_data(game))
-        # provoke model acceptance by tweaking updateThreshold to pass
-        custom_args = dict(args, updateThreshold=-0.1)
-        model_trainer = ModelTrainer.options(num_gpus=0).remote(
-            r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
-        )
-        ray.get(model_trainer.train.remote())
-        assert ray.get(s.get_revision.remote()) == 1
-        out, _err = capsys.readouterr()
-        assert "PITTING AGAINST PREVIOUS VERSION" in out
-        assert "ACCEPTING NEW MODEL" in out
-        ray.shutdown()
+    model_trainer = ModelTrainer.options(num_gpus=0).remote(
+        r, s, game, nnet.__class__, dict(args), selfplay_training_ratio=1
+    )
+    ray.get(model_trainer.start.remote())
+    assert ray.get(s.get_revision.remote()) > 0
+    assert ray.get(s.trained_enough.remote()) is True
+    ray.shutdown()
 
 
-def test_model_trainer_pit_reject_model(capsys):
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        ray.init(local_mode=True)
-        game = OthelloGame(6)
-        nnet = OthelloNNet(game)
-        s = SharedStorage.remote(nnet.get_weights())
-        assert ray.get(s.get_revision.remote()) == 0
-        r = ReplayBuffer.remote(
-            games_to_play=2, games_to_use=2, folder=tmpdirname
-        )
-        r.add_game_examples.remote(mock_example_data(game))
-        # provoke model rejection by tweaking updateThreshold to fail
-        custom_args = dict(args, updateThreshold=1.1)
-        model_trainer = ModelTrainer.options(num_gpus=0).remote(
-            r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
-        )
-        ray.get(model_trainer.train.remote())
-        assert ray.get(s.get_revision.remote()) == 0
-        out, _err = capsys.readouterr()
-        assert "PITTING AGAINST PREVIOUS VERSION" in out
-        assert "REJECTING NEW MODEL" in out
-        ray.shutdown()
+def test_model_trainer_pit_accept_model(capsys, tmpdir):
+    ray.init(local_mode=True, ignore_reinit_error=True)
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    s = SharedStorage.remote(nnet.get_weights())
+    assert ray.get(s.get_revision.remote()) == 0
+    r = ReplayBuffer.remote(games_to_play=2, games_to_use=2, folder=tmpdir)
+    r.add_game_examples.remote(mock_example_data(game))
+    # provoke model acceptance by tweaking updateThreshold to pass
+    custom_args = dict(args, updateThreshold=-0.1)
+    model_trainer = ModelTrainer.options(num_gpus=0).remote(
+        r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
+    )
+    ray.get(model_trainer.train.remote())
+    assert ray.get(s.get_revision.remote()) == 1
+    out, _err = capsys.readouterr()
+    assert "PITTING AGAINST PREVIOUS VERSION" in out
+    assert "ACCEPTING NEW MODEL" in out
+    ray.shutdown()
 
 
-def test_coach(capsys):
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        args.checkpoint = tmpdirname
-        game = OthelloGame(6)
-        nnet = OthelloNNet(game)
-        coach = Coach(game, nnet, args)
-        coach.learn()
+def test_model_trainer_pit_reject_model(capsys, tmpdir):
+    ray.init(local_mode=True, ignore_reinit_error=True)
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    s = SharedStorage.remote(nnet.get_weights())
+    assert ray.get(s.get_revision.remote()) == 0
+    r = ReplayBuffer.remote(games_to_play=2, games_to_use=2, folder=tmpdir)
+    r.add_game_examples.remote(mock_example_data(game))
+    # provoke model rejection by tweaking updateThreshold to fail
+    custom_args = dict(args, updateThreshold=1.1)
+    model_trainer = ModelTrainer.options(num_gpus=0).remote(
+        r, s, game, nnet.__class__, custom_args, pit_against_old_model=True
+    )
+    ray.get(model_trainer.train.remote())
+    assert ray.get(s.get_revision.remote()) == 0
+    out, _err = capsys.readouterr()
+    assert "PITTING AGAINST PREVIOUS VERSION" in out
+    assert "REJECTING NEW MODEL" in out
+    ray.shutdown()
+
+
+def test_coach(capsys, tmpdir):
+    args.checkpoint = tmpdir
+    game = OthelloGame(6)
+    nnet = OthelloNNet(game)
+    coach = Coach(game, nnet, args)
+    coach.learn()
