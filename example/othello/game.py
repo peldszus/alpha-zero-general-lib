@@ -94,7 +94,7 @@ class OthelloGame(Game):
         return result
 
     def string_representation(self, board):
-        return board.tostring()
+        return board.tobytes()
 
     def string_representation_readable(self, board):
         board_s = "".join(
