@@ -23,6 +23,6 @@ folder, filename = "./temp/", "best.pth.tar"
 player1 = BareModelPlayer(game, OthelloNNet, folder, filename)
 player2 = AlphaZeroPlayer(game, OthelloNNet, folder, filename)
 
-arena = Arena(player1.play, player2.play, game, display=OthelloGame.display)
+arena = Arena(player1, player2, game, display=OthelloGame.display)
 
 print(arena.play_games(10, verbose=True))

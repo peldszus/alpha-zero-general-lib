@@ -112,7 +112,7 @@ class League:
         name_b, player_b, elo_b = self._get_competitor(b)
         rating_a = elo_a.rating
         rating_b = elo_b.rating
-        arena = Arena(player_a.play, player_b.play, self.game)
+        arena = Arena(player_a, player_b, self.game)
         wins, losts, ties = arena.play_games(
             self.games, verbose=False, quiet=True
         )

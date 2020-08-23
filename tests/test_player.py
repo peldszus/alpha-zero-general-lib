@@ -34,6 +34,26 @@ def test_alpha_zero_player_from_checkpoint():
     assert action
 
 
+def test_alpha_zero_player_from_model():
+    game = OthelloGame(6)
+    some_net = OthelloNNet(game)
+    player = AlphaZeroPlayer(game, some_net)
+    board = game.get_init_board()
+    action = player.play(board)
+    assert action
+
+
+def test_alpha_zero_player_reset():
+    game = OthelloGame(6)
+    player = AlphaZeroPlayer(game, OthelloNNet, num_mcts_sims=4)
+    assert not player.mcts.Qsa
+    board = game.get_init_board()
+    player.play(board)
+    assert player.mcts.Qsa
+    player.reset()
+    assert not player.mcts.Qsa
+
+
 def test_bare_model_player():
     game = OthelloGame(6)
     player = BareModelPlayer(game, OthelloNNet)

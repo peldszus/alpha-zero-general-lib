@@ -1,3 +1,5 @@
+"""An Arena class where any 2 agents can be pit against each other."""
+
 from tqdm import tqdm
 
 
@@ -9,7 +11,7 @@ class Arena:
     def __init__(self, player1, player2, game, display=None):
         """
         Input:
-            player 1,2: two functions that takes board as input, return action
+            player 1,2: two instances of a Player class.
             game: Game object
             display: a function that takes board as input and prints it (e.g.
                      display in othello/OthelloGame). Is necessary for verbose
@@ -30,6 +32,7 @@ class Arena:
             or
                 draw result returned from the game that is neither 1, -1, nor 0.
         """
+        self.reset_players()
         players = [self.player2, None, self.player1]
         current_player = 1
         board = self.game.get_init_board()
@@ -40,7 +43,8 @@ class Arena:
                 assert self.display
                 print("Turn ", str(it), "Player ", str(current_player))
                 self.display(board)
-            action = players[current_player + 1](
+
+            action = players[current_player + 1].play(
                 self.game.get_canonical_form(board, current_player)
             )
 
@@ -105,3 +109,8 @@ class Arena:
                 draws += 1
 
         return one_won, two_won, draws
+
+    def reset_players(self):
+        """Reset the players."""
+        self.player1.reset()
+        self.player1.reset()

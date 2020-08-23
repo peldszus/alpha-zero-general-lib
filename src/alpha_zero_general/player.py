@@ -8,6 +8,7 @@ from abc import abstractmethod
 import numpy as np
 
 from .mcts import MCTS
+from .neuralnet import NeuralNet
 from .utils import DotDict
 
 
@@ -17,6 +18,13 @@ class Player(ABC):
     @abstractmethod
     def play(self, board):
         """Returns the action of the player for the given board."""
+
+    def reset(self):
+        """
+        Resets the players experience in the current game. Implement this to
+        reset information that should not get carried over to the next game.
+        """
+        pass
 
 
 class RandomPlayer(Player):
@@ -111,19 +119,31 @@ class AlphaZeroPlayer(Player):
     def __init__(
         self,
         game,
-        nnet_class,
+        nnet,
         folder=None,
         filename=None,
         num_mcts_sims=50,
         cpuct=1.0,
     ):
         self.game = game
-        self.net = nnet_class(game)
-        if folder and filename:
-            self.net.load_checkpoint(folder, filename)
+        if nnet and isinstance(nnet, NeuralNet):
+            self.net = nnet
+        elif nnet and issubclass(nnet, NeuralNet):
+            self.net = nnet(game)
+            if folder and filename:
+                self.net.load_checkpoint(folder, filename)
+        else:
+            raise ValueError(
+                "Either provide a NeuralNet subclass "
+                "or instance of it in `nnet`."
+            )
         self.args = DotDict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
         self.mcts = MCTS(self.game, self.net, self.args)
 
     def play(self, board):
         """Returns the action of the player for the given board."""
         return np.argmax(self.mcts.get_action_prob(board, temp=0))
+
+    def reset(self):
+        """Resets the players experience in/view of the current game."""
+        self.mcts = MCTS(self.game, self.net, self.args)

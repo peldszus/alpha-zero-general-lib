@@ -17,6 +17,7 @@ from tqdm import tqdm
 
 from .arena import Arena
 from .mcts import MCTS
+from .player import AlphaZeroPlayer
 from .utils import DotDict
 from .utils import parse_game_filename
 from .utils import parse_model_filename
@@ -305,13 +306,12 @@ class ModelTrainer:
         print("PITTING AGAINST PREVIOUS VERSION")
         old_net = self.nnet_class(self.game)
         old_net.set_weights(old_weights)
-        pmcts = MCTS(self.game, old_net, self.args)
-        nmcts = MCTS(self.game, self.nnet, self.args)
-        arena = Arena(
-            lambda x: np.argmax(pmcts.get_action_prob(x, temp=0)),
-            lambda x: np.argmax(nmcts.get_action_prob(x, temp=0)),
-            self.game,
+        kwargs = dict(
+            num_mcts_sims=self.args.numMCTSSims, cpuct=self.args.cpuct
         )
+        prev_model_player = AlphaZeroPlayer(self.game, old_net, **kwargs)
+        new_model_player = AlphaZeroPlayer(self.game, self.nnet, **kwargs)
+        arena = Arena(prev_model_player, new_model_player, self.game)
         pwins, nwins, draws = arena.play_games(self.args.arenaCompare)
         print("NEW/PREV WINS : %d / %d ; DRAWS : %d" % (nwins, pwins, draws))
         if (
