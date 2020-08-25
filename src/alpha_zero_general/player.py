@@ -94,7 +94,7 @@ class NeuralNetPlayer(Player):
         super().__init__(game)
         if nnet and isinstance(nnet, NeuralNet):
             self.net = nnet
-        elif nnet and issubclass(nnet, NeuralNet):
+        elif nnet and isinstance(nnet, type) and issubclass(nnet, NeuralNet):
             self.net = nnet(game)
             if folder and filename:
                 self.net.load_checkpoint(folder, filename)

@@ -91,8 +91,9 @@ def test_bare_model_player_from_model():
 def test_bare_model_player_invalid_nnet_parameter():
     neither_nnet_nor_nnet_class = "something_else"
     game = OthelloGame(6)
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError) as excinfo:
         BareModelPlayer(game, neither_nnet_nor_nnet_class)
+    assert "NeuralNet subclass or instance" in str(excinfo.value)
 
 
 def test_greedy_player():
