@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from alpha_zero_general import AlphaZeroPlayer
 from alpha_zero_general import BareModelPlayer
 from alpha_zero_general import GreedyPlayer
@@ -76,6 +77,22 @@ def test_bare_model_player_from_checkpoint():
     board = game.get_init_board()
     action = player.play(board)
     assert action
+
+
+def test_bare_model_player_from_model():
+    game = OthelloGame(6)
+    some_net = OthelloNNet(game)
+    player = BareModelPlayer(game, some_net)
+    board = game.get_init_board()
+    action = player.play(board)
+    assert action
+
+
+def test_bare_model_player_invalid_nnet_parameter():
+    neither_nnet_nor_nnet_class = "something_else"
+    game = OthelloGame(6)
+    with pytest.raises(TypeError):
+        BareModelPlayer(game, neither_nnet_nor_nnet_class)
 
 
 def test_greedy_player():

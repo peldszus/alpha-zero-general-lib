@@ -15,6 +15,9 @@ from .utils import DotDict
 class Player(ABC):
     """The base player class."""
 
+    def __init__(self, game):
+        self.game = game
+
     @abstractmethod
     def play(self, board):
         """Returns the action of the player for the given board."""
@@ -30,9 +33,6 @@ class Player(ABC):
 class RandomPlayer(Player):
     """Selects a random valid action."""
 
-    def __init__(self, game):
-        self.game = game
-
     def play(self, board):
         """Returns the action of the player for the given board."""
         action = np.random.randint(self.game.get_action_size())
@@ -44,9 +44,6 @@ class RandomPlayer(Player):
 
 class HumanPlayer(Player):
     """Selects an actions based on human input."""
-
-    def __init__(self, game):
-        self.game = game
 
     def play(self, board):
         """Returns the action of the player for the given board."""
@@ -72,9 +69,6 @@ class GreedyPlayer(Player):
     a heuristic evaluation function game.get_score().
     """
 
-    def __init__(self, game):
-        self.game = game
-
     def play(self, board):
         """Returns the action of the player for the given board."""
         valids = self.game.get_valid_moves(board, 1)
@@ -89,19 +83,33 @@ class GreedyPlayer(Player):
         return candidates[0][1]
 
 
-class BareModelPlayer(Player):
+class NeuralNetPlayer(Player):
+    """
+    A base class for players using a neural network.
+    """
+
+    def __init__(
+        self, game, nnet, folder=None, filename=None,
+    ):
+        super().__init__(game)
+        if nnet and isinstance(nnet, NeuralNet):
+            self.net = nnet
+        elif nnet and issubclass(nnet, NeuralNet):
+            self.net = nnet(game)
+            if folder and filename:
+                self.net.load_checkpoint(folder, filename)
+        else:
+            raise TypeError(
+                "Either provide a NeuralNet subclass "
+                "or instance of it in `nnet`."
+            )
+
+
+class BareModelPlayer(NeuralNetPlayer):
     """
     Selects the actions with the highest probability according to the model
     without simulating future steps using MCTS.
     """
-
-    def __init__(
-        self, game, nnet_class, folder=None, filename=None,
-    ):
-        self.game = game
-        self.net = nnet_class(game)
-        if folder and filename:
-            self.net.load_checkpoint(folder, filename)
 
     def play(self, board):
         """Returns the action of the player for the given board."""
@@ -110,33 +118,16 @@ class BareModelPlayer(Player):
         return np.argmax(pi * valids)
 
 
-class AlphaZeroPlayer(Player):
+class AlphaZeroPlayer(NeuralNetPlayer):
     """
     Selects the actions with the best outcome according to the model when
     simulating future steps using MCTS.
     """
 
     def __init__(
-        self,
-        game,
-        nnet,
-        folder=None,
-        filename=None,
-        num_mcts_sims=50,
-        cpuct=1.0,
+        self, *args, num_mcts_sims=50, cpuct=1.0, **kwargs,
     ):
-        self.game = game
-        if nnet and isinstance(nnet, NeuralNet):
-            self.net = nnet
-        elif nnet and issubclass(nnet, NeuralNet):
-            self.net = nnet(game)
-            if folder and filename:
-                self.net.load_checkpoint(folder, filename)
-        else:
-            raise ValueError(
-                "Either provide a NeuralNet subclass "
-                "or instance of it in `nnet`."
-            )
+        super().__init__(*args, **kwargs)
         self.args = DotDict({"numMCTSSims": num_mcts_sims, "cpuct": cpuct})
         self.mcts = MCTS(self.game, self.net, self.args)
 
