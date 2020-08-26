@@ -2,7 +2,7 @@
 name = "alpha-zero-general-lib"
 version = "0.1.0"
 description = "A simplified, highly flexible, commented and (hopefully) easy to understand implementation of self-play based reinforcement learning based on the AlphaGo Zero paper turned into a library"
-authors = ["Surag Nair", "Andreas Peldszus"]
+authors = ["Andreas Peldszus", "Surag Nair"]
 license = "MIT"
 packages = [
     { include = "alpha_zero_general", from = "src" },
