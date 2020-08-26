@@ -7,18 +7,25 @@
 
 This is a fork of https://github.com/suragnair/alpha-zero-general turned into a library.
 
-The idea is to have a small and clean library version of the code, with minimal requirements, without many implementations of specific games or large model files.
+The idea is to have a small and clean library version of the code, with minimal requirements, without many implementations of specific games or large model files. The only 'heavy' requirement is the [ray](https://github.com/ray-project/ray/)-library, which is used to make the algorithm fully async and parallelized (potentially even across multiple machines).
 
 
 ## Information
 
-A simplified, highly flexible, commented and (hopefully) easy to understand implementation of self-play based reinforcement learning based on the AlphaGo Zero paper (Silver et al). It is designed to be easy to adopt for any two-player turn-based adversarial game and any deep learning framework of your choice. A sample implementation has been provided for the game of Othello in TensorFlow/Keras, see `example/othello/`.
+A simplified, highly flexible, commented and (hopefully) easy to understand implementation of the self-play based reinforcement learning algorithm Alpha Zero. It is designed to be easy to adopt for any two-player turn-based adversarial game with perfect information. Use it with the machine learning framework you like. A sample implementation has been provided for the game of Othello in TensorFlow/Keras, see `example/othello/`.
 
-To use this library for a game of your choice, subclass from `alpha_zero_general.Game` and `alpha_zero_general.NeuralNet` and implement their functions.
 
-`alpha_zero_general.Coach` contains the core training loop and ```alpha_zero_general.MCTS``` performs the Monte Carlo Tree Search.
+## Usage
 
-## TODO list
+To use this library for the game of your choice, subclass from `Game` and `NeuralNet` and implement their functions. Define your config and use the `Coach` to start the learning algorithm. Test your model by playing against it in the `Arena` against one of the `Player` classes. Evaluate multiple players in a `League` and let it calculate the ELO score for you.
+
+
+## Motivation
+
+Why did I do this? Well, mostly for myself. :) I wanted to play with the algorithm, I was in a mood of working with existing code, and I wanted to learn about ray.
+
+
+## ToDo list
 
 **Library:**
 * [x] Poetry based build that works as library
@@ -50,10 +57,11 @@ To use this library for a game of your choice, subclass from `alpha_zero_general
 
 **Asynchronous & parallel processing:**
 * [x] Ray step 1: Use Ray to parallelize self-play
-* [x] Ray step 2: Share weights across ray actors (for multi-machine parallelization)
+* [x] Ray step 2: Share weights across ray actors
 * [x] Ray step 3: Make self-play and training fully async
-* [ ] Ray step 4: Parallelize the arena play during league execution
 * [x] Add parameter to control selfplay vs training
+* [ ] Ray step 4: Parallelize the arena play during league execution
+* [ ] Successfully try multi-machine parallelization
 
 **Improvements:**
 * [x] Store all models, if accepted or not
