@@ -5,6 +5,9 @@
 [![GitHub](https://img.shields.io/github/license/peldszus/alpha-zero-general-lib)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
 
+
+An implementation of the [AlphaZero](https://doi.org/10.1126/science.aar6404) algorithm for adversarial games to be used with the machine learning framework of your choice.
+
 This is a fork of https://github.com/suragnair/alpha-zero-general turned into a library.
 
 The idea is to have a small and clean library version of the code, with minimal requirements, without many implementations of specific games or large model files. The only 'heavy' requirement is the [ray](https://github.com/ray-project/ray/)-library, which is used to make the algorithm fully async and parallelized (potentially even across multiple machines).
