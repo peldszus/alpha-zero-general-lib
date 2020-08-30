@@ -6,7 +6,7 @@ from alpha_zero_general import HumanPlayer  # noqa
 from alpha_zero_general import RandomPlayer  # noqa
 
 from .game import OthelloGame
-from .keras import OthelloNNet
+from .pytorch import OthelloNNet
 
 """
 use this script to play any two agents against each other, or play manually with
@@ -15,7 +15,7 @@ any agent.
 
 game = OthelloGame(6)
 
-folder, filename = "./temp/", "best.pth.tar"
+folder, filename = "./runs/1", "model_00100"
 
 # player1 = RandomPlayer(game)
 # player1 = GreedyPlayer(game)
