@@ -73,7 +73,54 @@ Why did I do this? Well, mostly for myself. :) I wanted to play with the algorit
 * [x] League evaluations with ELO scores
 
 
+## Develop
+
+Requirements:
+* Operating system: Linux/Mac (Windows is only experimental in the ray-library)
+* Python >= 3.7
+
+
+To locally build and install, simply run
+```
+make
+```
+
+To execute the tests, run
+```
+make test
+```
+
+This will additionally install tensorflow, because the keras example implementation of Othello is used during the tests.
+
+
+## Evaluate
+
+How can I know a change in the code/a change of parameters is actually for the good? How can I evaluate that this brings better results?
+
+* First rule: Only change one parameter at a time when comparing two runs.
+* Random choice is also a parameter: Be sure to set the same random seeds across runs: for python, for numpy, and for your framework, like tensorflow/pytorch.
+* Repeat your experiment with different random seeds.
+* Initial model parameters are parameters: Start from the same initialized (untrained) model across runs.
+* Be aware that changing e.g. exploration parameters might have a different impact in different phases of the training. Ideally, you have an 'early' game model (where the model has only seen a none to few games), a 'mid' game (where it has seen several thousand games) and a 'late' game model (which as seen a lot of games). Observe the effect of your change of code/parameters in all three stages.
+* Don't compare the model training losses. Since the training data is continuously changing, you wouldn't have a common ground for comparing those.
+* Compare the game play performance:
+  * Let two competitor agents play against each other in the Arena (remember this requires that changes to the code need to be fully parameterized).
+  * Let two competitor agents play against baselines (like `RandomPlayer`, `GreedyPlayer`, `BareModelPlayer`).
+  * Observe the win rate or the ELO in a tournament.
+
 
 ## Contributors and Credits
 * The original version was written by [Surag Nair](https://github.com/suragnair) and credits go to all contributors of https://github.com/suragnair/alpha-zero-general.
 * The use of ray is inspired by https://github.com/werner-duvaud/muzero-general.
+
+
+
+
+* conftest, for game net and tempdir
+* remaining coverage
+* replace name
+x add pytorch example
+* fix warnings as far as possible
+* train some useful model
+* remove obsolete parameters
+* add game-based parameters
