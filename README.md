@@ -36,6 +36,8 @@ Why did I do this? Well, mostly for myself. :) I wanted to play with the algorit
 * [ ] More documentation
 * [ ] Provide one entrypoint for training and pitting
 * [ ] A first pypi release
+* [ ] Work on remaining test coverage gaps
+* [ ] Add fixtures in conftest, for game net and tempdir
 
 **Refactor:**
 * [x] Use `tqdm` for progress bars
@@ -49,6 +51,8 @@ Why did I do this? Well, mostly for myself. :) I wanted to play with the algorit
 * [ ] Make MCTS and model parameters explicit
 * [ ] .. or replace DotDict with overall config class
 * [ ] Use logging
+* [ ] Remove obsolete parameters
+* [ ] Add game-based parameters
 
 **General player classes:**
 * [x] AlphaZeroPlayer out of pit code
@@ -112,15 +116,3 @@ How can I know a change in the code/a change of parameters is actually for the g
 ## Contributors and Credits
 * The original version was written by [Surag Nair](https://github.com/suragnair) and credits go to all contributors of https://github.com/suragnair/alpha-zero-general.
 * The use of ray is inspired by https://github.com/werner-duvaud/muzero-general.
-
-
-
-
-* conftest, for game net and tempdir
-* remaining coverage
-* replace name
-x add pytorch example
-* fix warnings as far as possible
-* train some useful model
-* remove obsolete parameters
-* add game-based parameters
